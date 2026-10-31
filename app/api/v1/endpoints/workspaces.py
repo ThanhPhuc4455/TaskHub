@@ -1,0 +1,36 @@
+from fastapi import APIRouter, status
+
+from app.api.deps import WorkspaceServiceDep
+from app.models.workspace import Workspace
+from app.schemas.workspace import WorkspaceCreate, WorkspaceRead, WorkspaceUpdate
+
+router = APIRouter(prefix="/workspaces", tags=["workspaces"])
+
+TEMP_OWNER_ID = 1  # TODO: thay bằng current_user khi có auth
+
+
+@router.post("", response_model=WorkspaceRead, status_code=status.HTTP_201_CREATED)
+async def create_workspace(payload: WorkspaceCreate, service: WorkspaceServiceDep) -> Workspace:
+    return await service.create(payload, owner_id=TEMP_OWNER_ID)
+
+
+@router.get("", response_model=list[WorkspaceRead])
+async def list_workspaces(service: WorkspaceServiceDep) -> list[Workspace]:
+    return await service.get_all()
+
+
+@router.get("/{workspace_id}", response_model=WorkspaceRead)
+async def get_workspace(workspace_id: int, service: WorkspaceServiceDep) -> Workspace:
+    return await service.get(workspace_id)
+
+
+@router.patch("/{workspace_id}", response_model=WorkspaceRead)
+async def update_workspace(
+    workspace_id: int, payload: WorkspaceUpdate, service: WorkspaceServiceDep
+) -> Workspace:
+    return await service.update(workspace_id, payload)
+
+
+@router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_workspace(workspace_id: int, service: WorkspaceServiceDep) -> None:
+    await service.delete(workspace_id)
