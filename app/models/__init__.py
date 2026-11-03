@@ -1,5 +1,17 @@
-from app.models.base import Base
-from app.models.user import User
-from app.models.workspace import Workspace
 
-__all__ = ["Base", "User", "Workspace"]
+from app.models.base import Base
+from app.models.user import User, UserRole
+from app.models.workspace import Workspace
+from app.models.workspace_member import (
+    WorkspaceMember,
+    WorkspaceMemberRole,
+)
+
+__all__ = [
+    "Base",
+    "User",
+    "UserRole",
+    "Workspace",
+    "WorkspaceMember",
+    "WorkspaceMemberRole",
+]
