@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 if TYPE_CHECKING:
+    from app.models.project import Project
     from app.models.user import User
     from app.models.workspace_member import WorkspaceMember
 
@@ -41,6 +42,12 @@ class Workspace(Base):
     )
 
     memberships: Mapped[list["WorkspaceMember"]] = relationship(
+        back_populates="workspace",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    projects: Mapped[list["Project"]] = relationship(
         back_populates="workspace",
         cascade="all, delete-orphan",
         passive_deletes=True,
