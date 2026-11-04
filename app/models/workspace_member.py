@@ -1,16 +1,20 @@
-
 import enum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Enum, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship      
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.models.base import Base
-from app.models.user import User
-from app.models.workspace import Workspace
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.workspace import Workspace
 
 
-class WorkspaceMemberRole(str, enum.Enum):
-    ADMIN = "ADMIN"
-    MEMBER = "MEMBER"
+class WorkspaceMemberRole(enum.StrEnum):
+    OWNER = "OWNER"
+    EDITOR = "EDITOR"
+    VIEWER = "VIEWER"
 
 
 class WorkspaceMember(Base):
@@ -24,6 +28,7 @@ class WorkspaceMember(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
         primary_key=True,
+        index=True,
     )
 
     role: Mapped[WorkspaceMemberRole] = mapped_column(
@@ -31,10 +36,12 @@ class WorkspaceMember(Base):
             WorkspaceMemberRole,
             name="workspace_member_role",
             native_enum=False,
+            length=20,
         ),
-        default=WorkspaceMemberRole.MEMBER,
+        default=WorkspaceMemberRole.VIEWER,
         nullable=False,
     )
+
     workspace: Mapped["Workspace"] = relationship(
         back_populates="memberships",
     )

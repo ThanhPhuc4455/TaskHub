@@ -1,13 +1,18 @@
-
 import enum
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Enum, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.models.base import Base
 
+if TYPE_CHECKING:
+    from app.models.workspace import Workspace
+    from app.models.workspace_member import WorkspaceMember
 
-class UserRole(str, enum.Enum):
+
+class UserRole(enum.StrEnum):
     ADMIN = "ADMIN"
     MEMBER = "MEMBER"
 
@@ -42,6 +47,7 @@ class User(Base):
             UserRole,
             name="user_role",
             native_enum=False,
+            length=20,
         ),
         default=UserRole.MEMBER,
         nullable=False,
@@ -57,6 +63,7 @@ class User(Base):
         server_default=func.now(),
         nullable=False,
     )
+
     owned_workspaces: Mapped[list["Workspace"]] = relationship(
         back_populates="owner",
     )
