@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.constants import WORKSPACE_NAME_MAX_LENGTH
 from app.models.base import Base
 
 if TYPE_CHECKING:
@@ -21,7 +22,7 @@ class Workspace(Base):
     )
 
     name: Mapped[str] = mapped_column(
-        String(100),
+        String(WORKSPACE_NAME_MAX_LENGTH),
         nullable=False,
     )
 

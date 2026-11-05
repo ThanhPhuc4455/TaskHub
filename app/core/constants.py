@@ -1,0 +1,4 @@
+WORKSPACE_NAME_MIN_LENGTH = 1
+WORKSPACE_NAME_MAX_LENGTH = 100
+
+NOT_FOUND_MESSAGE = "{resource} {resource_id} not found"

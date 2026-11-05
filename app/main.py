@@ -3,17 +3,20 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.database import engine
 from app.core.exceptions import NotFoundError
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    print("Startup")  # ngày 2: mở kết nối DB
+    async with engine.connect() as conn:
+        await conn.execute(text("SELECT 1"))  # fail-fast nếu không nối được DB
     yield
-    print("Shutdown")  # ngày 2: đóng kết nối DB
+    await engine.dispose()
 
 
 app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)

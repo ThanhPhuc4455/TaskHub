@@ -1,15 +1,17 @@
-from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import get_db_session
 from app.repositories.workspace_repository import WorkspaceRepository
 from app.services.workspace_service import WorkspaceService
 
 
-@lru_cache
-def get_workspace_repository() -> WorkspaceRepository:
-    return WorkspaceRepository()
+def get_workspace_repository(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> WorkspaceRepository:
+    return WorkspaceRepository(session)
 
 
 def get_workspace_service(
