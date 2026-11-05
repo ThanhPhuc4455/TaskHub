@@ -4,7 +4,9 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db_session
+from app.repositories.user_repository import UserRepository
 from app.repositories.workspace_repository import WorkspaceRepository
+from app.services.auth_service import AuthService
 from app.services.workspace_service import WorkspaceService
 
 
@@ -21,3 +23,18 @@ def get_workspace_service(
 
 
 WorkspaceServiceDep = Annotated[WorkspaceService, Depends(get_workspace_service)]
+
+
+def get_user_repository(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> UserRepository:
+    return UserRepository(session)
+
+
+def get_auth_service(
+    users: Annotated[UserRepository, Depends(get_user_repository)],
+) -> AuthService:
+    return AuthService(users)
+
+
+AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
