@@ -1,17 +1,17 @@
 from fastapi import APIRouter, status
 
-from app.api.deps import WorkspaceServiceDep
+from app.api.deps import CurrentUser, WorkspaceServiceDep
 from app.models.workspace import Workspace
 from app.schemas.workspace import WorkspaceCreate, WorkspaceRead, WorkspaceUpdate
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
-TEMP_OWNER_ID = 1  # TODO: thay bằng current_user khi có auth
-
 
 @router.post("", response_model=WorkspaceRead, status_code=status.HTTP_201_CREATED)
-async def create_workspace(payload: WorkspaceCreate, service: WorkspaceServiceDep) -> Workspace:
-    return await service.create(payload, owner_id=TEMP_OWNER_ID)
+async def create_workspace(
+    payload: WorkspaceCreate, service: WorkspaceServiceDep, current_user: CurrentUser
+) -> Workspace:
+    return await service.create(payload, owner_id=current_user.id)
 
 
 @router.get("", response_model=list[WorkspaceRead])
