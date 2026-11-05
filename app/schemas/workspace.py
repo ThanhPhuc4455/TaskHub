@@ -2,13 +2,23 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.constants import WORKSPACE_NAME_MAX_LENGTH, WORKSPACE_NAME_MIN_LENGTH
+from app.schemas.base import BasePatchSchema, BaseSchema
 
-class WorkspaceCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
+
+class WorkspaceCreate(BaseSchema):
+    name: str = Field(
+        min_length=WORKSPACE_NAME_MIN_LENGTH,
+        max_length=WORKSPACE_NAME_MAX_LENGTH,
+    )
 
 
-class WorkspaceUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=100)
+class WorkspaceUpdate(BasePatchSchema):
+    name: str | None = Field(
+        default=None,
+        min_length=WORKSPACE_NAME_MIN_LENGTH,
+        max_length=WORKSPACE_NAME_MAX_LENGTH,
+    )
 
 
 class WorkspaceRead(BaseModel):

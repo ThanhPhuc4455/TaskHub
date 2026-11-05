@@ -26,5 +26,5 @@ class WorkspaceService:
         return await self._repo.update(workspace, data)
 
     async def delete(self, workspace_id: int) -> None:
-        await self.get(workspace_id)  # ném NotFoundError nếu không tồn tại
-        await self._repo.delete(workspace_id)
+        workspace = await self.get(workspace_id)
+        await self._repo.delete(workspace)
