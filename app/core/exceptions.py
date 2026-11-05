@@ -6,3 +6,11 @@ class NotFoundError(Exception):
         self.resource = resource
         self.resource_id = resource_id
         super().__init__(NOT_FOUND_MESSAGE.format(resource=resource, resource_id=resource_id))
+
+
+class ConflictError(Exception):
+    """Data conflicts with an existing resource."""
+
+
+class AuthenticationError(Exception):
+    """Authentication failed or a token is invalid."""
