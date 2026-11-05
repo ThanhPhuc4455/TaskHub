@@ -25,3 +25,11 @@ async def test_workspace_crud(client: AsyncClient) -> None:
 
 async def test_create_with_empty_name_returns_422(client: AsyncClient) -> None:
     assert (await client.post(BASE, json={"name": ""})).status_code == 422
+
+
+async def test_patch_null_name_returns_422(client: AsyncClient) -> None:
+    created = await client.post(BASE, json={"name": "Team A"})
+    workspace_id = created.json()["id"]
+    response = await client.patch(f"{BASE}/{workspace_id}", json={"name": None})
+    assert response.status_code == 422
+    assert (await client.get(f"{BASE}/{workspace_id}")).status_code == 200
