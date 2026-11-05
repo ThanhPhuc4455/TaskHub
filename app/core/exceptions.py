@@ -14,3 +14,7 @@ class ConflictError(Exception):
 
 class AuthenticationError(Exception):
     """Authentication failed or a token is invalid."""
+
+
+class BadRequestError(Exception):
+    """The request is invalid from a business perspective."""
