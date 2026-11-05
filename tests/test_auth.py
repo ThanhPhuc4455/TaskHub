@@ -62,3 +62,26 @@ async def test_refresh_and_token_type_check(client: AsyncClient) -> None:
     assert ok.status_code == 200
     bad = await client.post(f"{AUTH}/refresh", json={"refresh_token": tokens["access_token"]})
     assert bad.status_code == 401
+
+
+async def test_logout_revokes_refresh_token(client: AsyncClient) -> None:
+    await client.post(f"{AUTH}/register", json=USER)
+    tokens = await login(client, USER["email"], USER["password"])
+    body = {"refresh_token": tokens["refresh_token"]}
+
+    assert (await client.post(f"{AUTH}/logout", json=body)).status_code == 204
+    assert (await client.post(f"{AUTH}/refresh", json=body)).status_code == 401
+    assert (await client.post(f"{AUTH}/logout", json=body)).status_code == 204
+
+
+async def test_refresh_token_is_rotated(client: AsyncClient) -> None:
+    await client.post(f"{AUTH}/register", json=USER)
+    tokens = await login(client, USER["email"], USER["password"])
+    old = {"refresh_token": tokens["refresh_token"]}
+
+    first = await client.post(f"{AUTH}/refresh", json=old)
+    assert first.status_code == 200
+    assert (await client.post(f"{AUTH}/refresh", json=old)).status_code == 401
+
+    new = {"refresh_token": first.json()["refresh_token"]}
+    assert (await client.post(f"{AUTH}/refresh", json=new)).status_code == 200
