@@ -26,3 +26,8 @@ async def login(
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(payload: RefreshRequest, service: AuthServiceDep) -> TokenResponse:
     return await service.refresh(payload.refresh_token)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(payload: RefreshRequest, service: AuthServiceDep) -> None:
+    await service.logout(payload.refresh_token)

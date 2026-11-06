@@ -8,7 +8,13 @@ from sqlalchemy import text
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.database import engine
-from app.core.exceptions import AuthenticationError, ConflictError, NotFoundError
+from app.core.exceptions import (
+    AuthenticationError,
+    BadRequestError,
+    ConflictError,
+    ForbiddenError,
+    NotFoundError,
+)
 
 
 @asynccontextmanager
@@ -39,6 +45,16 @@ async def authentication_handler(request: Request, exc: AuthenticationError) -> 
         content={"detail": str(exc)},
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+
+@app.exception_handler(BadRequestError)
+async def bad_request_handler(request: Request, exc: BadRequestError) -> JSONResponse:
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(ForbiddenError)
+async def forbidden_handler(request: Request, exc: ForbiddenError) -> JSONResponse:
+    return JSONResponse(status_code=403, content={"detail": str(exc)})
 
 
 @app.get("/health", tags=["system"])

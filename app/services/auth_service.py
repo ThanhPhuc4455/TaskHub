@@ -14,13 +14,15 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import User
+from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import RegisterRequest, TokenResponse
 
 
 class AuthService:
-    def __init__(self, users: UserRepository) -> None:
+    def __init__(self, users: UserRepository, tokens: RefreshTokenRepository) -> None:
         self._users = users
+        self._tokens = tokens
 
     async def register(self, payload: RegisterRequest) -> User:
         if await self._users.get_by_email(payload.email) is not None:
@@ -38,18 +40,27 @@ class AuthService:
             raise AuthenticationError(INVALID_CREDENTIALS_MESSAGE)
         if not user.is_active:
             raise AuthenticationError(INACTIVE_USER_MESSAGE)
-        return self._issue_tokens(user.id)
+        return await self._issue_tokens(user.id)
 
     async def refresh(self, refresh_token: str) -> TokenResponse:
         payload = decode_token(refresh_token, REFRESH)
+        stored = await self._tokens.get_by_jti(payload.jti)
+        if stored is None or stored.revoked:
+            raise AuthenticationError(INVALID_TOKEN_MESSAGE)
         user = await self._users.get(payload.user_id)
         if user is None or not user.is_active:
             raise AuthenticationError(INVALID_TOKEN_MESSAGE)
-        return self._issue_tokens(user.id)
+        await self._tokens.update(stored, {"revoked": True})
+        return await self._issue_tokens(user.id)
 
-    @staticmethod
-    def _issue_tokens(user_id: int) -> TokenResponse:
-        return TokenResponse(
-            access_token=create_access_token(user_id).token,
-            refresh_token=create_refresh_token(user_id).token,
-        )
+    async def logout(self, refresh_token: str) -> None:
+        payload = decode_token(refresh_token, REFRESH)
+        stored = await self._tokens.get_by_jti(payload.jti)
+        if stored is not None and not stored.revoked:
+            await self._tokens.update(stored, {"revoked": True})
+
+    async def _issue_tokens(self, user_id: int) -> TokenResponse:
+        access = create_access_token(user_id)
+        refresh = create_refresh_token(user_id)
+        await self._tokens.create(jti=refresh.jti, user_id=user_id, expires_at=refresh.expires_at)
+        return TokenResponse(access_token=access.token, refresh_token=refresh.token)

@@ -36,3 +36,14 @@ async def client() -> AsyncIterator[AsyncClient]:
         yield c
     app.dependency_overrides.clear()
     await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def auth_client(client: AsyncClient) -> AsyncClient:
+    user = {"email": "owner@example.com", "password": "password123", "full_name": "Owner"}
+    await client.post("/api/v1/auth/register", json=user)
+    response = await client.post(
+        "/api/v1/auth/login", data={"username": user["email"], "password": user["password"]}
+    )
+    client.headers["Authorization"] = f"Bearer {response.json()['access_token']}"
+    return client
