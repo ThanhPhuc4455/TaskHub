@@ -12,6 +12,7 @@ from app.core.security import ACCESS, decode_token
 from app.models.user import User
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
+from app.repositories.workspace_member_repository import WorkspaceMemberRepository
 from app.repositories.workspace_repository import WorkspaceRepository
 from app.services.auth_service import AuthService
 from app.services.user_service import UserService
@@ -24,10 +25,17 @@ def get_workspace_repository(
     return WorkspaceRepository(session)
 
 
+def get_workspace_member_repository(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> WorkspaceMemberRepository:
+    return WorkspaceMemberRepository(session)
+
+
 def get_workspace_service(
-    repo: Annotated[WorkspaceRepository, Depends(get_workspace_repository)],
+    workspaces: Annotated[WorkspaceRepository, Depends(get_workspace_repository)],
+    members: Annotated[WorkspaceMemberRepository, Depends(get_workspace_member_repository)],
 ) -> WorkspaceService:
-    return WorkspaceService(repo)
+    return WorkspaceService(workspaces, members)
 
 
 WorkspaceServiceDep = Annotated[WorkspaceService, Depends(get_workspace_service)]
