@@ -15,6 +15,7 @@ from app.repositories.user_repository import UserRepository
 from app.repositories.workspace_member_repository import WorkspaceMemberRepository
 from app.repositories.workspace_repository import WorkspaceRepository
 from app.services.auth_service import AuthService
+from app.services.member_service import MemberService
 from app.services.user_service import UserService
 from app.services.workspace_service import WorkspaceService
 
@@ -45,6 +46,17 @@ def get_user_repository(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> UserRepository:
     return UserRepository(session)
+
+
+def get_member_service(
+    workspaces: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    members: Annotated[WorkspaceMemberRepository, Depends(get_workspace_member_repository)],
+    users: Annotated[UserRepository, Depends(get_user_repository)],
+) -> MemberService:
+    return MemberService(workspaces, members, users)
+
+
+MemberServiceDep = Annotated[MemberService, Depends(get_member_service)]
 
 
 def get_refresh_token_repository(
