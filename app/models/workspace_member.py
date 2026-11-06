@@ -16,6 +16,17 @@ class WorkspaceMemberRole(enum.StrEnum):
     EDITOR = "EDITOR"
     VIEWER = "VIEWER"
 
+    @property
+    def rank(self) -> int:
+        return _ROLE_RANK[self]
+
+
+_ROLE_RANK: dict[WorkspaceMemberRole, int] = {
+    WorkspaceMemberRole.VIEWER: 1,
+    WorkspaceMemberRole.EDITOR: 2,
+    WorkspaceMemberRole.OWNER: 3,
+}
+
 
 class WorkspaceMember(Base):
     __tablename__ = "workspace_members"

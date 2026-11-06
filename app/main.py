@@ -12,6 +12,7 @@ from app.core.exceptions import (
     AuthenticationError,
     BadRequestError,
     ConflictError,
+    ForbiddenError,
     NotFoundError,
 )
 
@@ -49,6 +50,11 @@ async def authentication_handler(request: Request, exc: AuthenticationError) -> 
 @app.exception_handler(BadRequestError)
 async def bad_request_handler(request: Request, exc: BadRequestError) -> JSONResponse:
     return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(ForbiddenError)
+async def forbidden_handler(request: Request, exc: ForbiddenError) -> JSONResponse:
+    return JSONResponse(status_code=403, content={"detail": str(exc)})
 
 
 @app.get("/health", tags=["system"])
