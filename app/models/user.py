@@ -51,6 +51,7 @@ class User(Base):
             name="user_role",
             native_enum=False,
             length=ENUM_MAX_LENGTH,
+            create_constraint=True,
         ),
         default=UserRole.MEMBER,
         nullable=False,

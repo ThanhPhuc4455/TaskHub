@@ -34,6 +34,7 @@ class WorkspaceMember(Base):
             name="workspace_member_role",
             native_enum=False,
             length=ENUM_MAX_LENGTH,
+            create_constraint=True,
         ),
         default=WorkspaceMemberRole.VIEWER,
         nullable=False,

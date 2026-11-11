@@ -32,7 +32,13 @@ class Project(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     status: Mapped[ProjectStatus] = mapped_column(
-        Enum(ProjectStatus, name="project_status", native_enum=False, length=ENUM_MAX_LENGTH),
+        Enum(
+            ProjectStatus,
+            name="project_status",
+            native_enum=False,
+            length=ENUM_MAX_LENGTH,
+            create_constraint=True,
+        ),
         default=ProjectStatus.ACTIVE,
         nullable=False,
     )
