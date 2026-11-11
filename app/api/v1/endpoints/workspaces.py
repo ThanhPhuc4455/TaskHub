@@ -1,10 +1,11 @@
 from fastapi import APIRouter, status
 
 from app.api.deps import CurrentUser, PaginationDep, WorkspaceServiceDep
+from app.api.responses import RBAC_RESPONSES
 from app.models.workspace import Workspace
 from app.schemas.workspace import WorkspaceCreate, WorkspaceRead, WorkspaceUpdate
 
-router = APIRouter(prefix="/workspaces", tags=["workspaces"])
+router = APIRouter(prefix="/workspaces", tags=["workspaces"], responses=RBAC_RESPONSES)
 
 
 @router.post("", response_model=WorkspaceRead, status_code=status.HTTP_201_CREATED)

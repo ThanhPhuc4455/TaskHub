@@ -1,10 +1,15 @@
 from fastapi import APIRouter, status
 
 from app.api.deps import CurrentUser, MemberServiceDep, PaginationDep
+from app.api.responses import RBAC_RESPONSES
 from app.models.workspace_member import WorkspaceMember
 from app.schemas.member import InviteMemberRequest, MemberRead, UpdateMemberRoleRequest
 
-router = APIRouter(prefix="/workspaces/{workspace_id}/members", tags=["members"])
+router = APIRouter(
+    prefix="/workspaces/{workspace_id}/members",
+    tags=["members"],
+    responses=RBAC_RESPONSES,
+)
 
 
 @router.get("", response_model=list[MemberRead])
