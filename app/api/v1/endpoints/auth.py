@@ -23,11 +23,21 @@ async def login(
     return await service.login(form.username, form.password)
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    summary="Rotate a refresh token",
+    responses={401: {"description": "Invalid, expired, or revoked refresh token"}},
+)
 async def refresh(payload: RefreshRequest, service: AuthServiceDep) -> TokenResponse:
     return await service.refresh(payload.refresh_token)
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Revoke a refresh token",
+    responses={401: {"description": "Invalid, expired, or unknown refresh token"}},
+)
 async def logout(payload: RefreshRequest, service: AuthServiceDep) -> None:
     await service.logout(payload.refresh_token)

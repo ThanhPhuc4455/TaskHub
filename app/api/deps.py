@@ -71,8 +71,9 @@ async def get_current_user(
 
 def get_user_service(
     users: Annotated[UserRepository, Depends(get_user_repository)],
+    tokens: Annotated[RefreshTokenRepository, Depends(get_refresh_token_repository)],
 ) -> UserService:
-    return UserService(users)
+    return UserService(users, tokens)
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
