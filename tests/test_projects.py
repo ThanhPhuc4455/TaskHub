@@ -84,6 +84,50 @@ async def test_owner_can_archive_project(client: AsyncClient) -> None:
     assert archive.status_code == 200
     assert archive.json()["status"] == "ARCHIVED"
 
+    update = await client.patch(
+        f"/api/v1/projects/{project_id}",
+        json={"name": "No longer editable"},
+        headers=owner,
+    )
+    assert update.status_code == 400
+
+    deleted = await client.delete(f"/api/v1/projects/{project_id}", headers=owner)
+    assert deleted.status_code == 204
+
+
+async def test_workspace_delete_cascades_projects(client: AsyncClient) -> None:
+    owner = await login_as(client, "owner@example.com")
+    workspace_id = await create_workspace(client, owner)
+    created = await client.post(
+        f"{WS}/{workspace_id}/projects",
+        json={"name": "Project"},
+        headers=owner,
+    )
+    project_id = created.json()["id"]
+
+    deleted = await client.delete(f"{WS}/{workspace_id}", headers=owner)
+    assert deleted.status_code == 204
+    assert (await client.get(f"/api/v1/projects/{project_id}", headers=owner)).status_code == 404
+
+
+async def test_project_list_supports_pagination(client: AsyncClient) -> None:
+    owner = await login_as(client, "owner@example.com")
+    workspace_id = await create_workspace(client, owner)
+    for name in ("Project A", "Project B"):
+        response = await client.post(
+            f"{WS}/{workspace_id}/projects",
+            json={"name": name},
+            headers=owner,
+        )
+        assert response.status_code == 201
+
+    response = await client.get(
+        f"{WS}/{workspace_id}/projects?page=2&limit=1",
+        headers=owner,
+    )
+    assert response.status_code == 200
+    assert [project["name"] for project in response.json()] == ["Project B"]
+
 
 async def test_project_idor_is_hidden_from_other_workspace(client: AsyncClient) -> None:
     owner_a = await login_as(client, "owner-a@example.com")

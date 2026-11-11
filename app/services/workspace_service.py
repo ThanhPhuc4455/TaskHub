@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from app.core.constants import FORBIDDEN_MESSAGE
 from app.core.exceptions import ForbiddenError, NotFoundError
+from app.core.pagination import Pagination
 from app.models.user import User, UserRole
 from app.models.workspace import Workspace
 from app.models.workspace_member import WorkspaceMemberRole
@@ -16,6 +17,20 @@ class WorkspaceAccessContext:
     user: User
     effective_role: WorkspaceMemberRole
     workspace: Workspace
+
+
+async def authorize_resource[ResourceT](
+    resource: ResourceT | None,
+    resource_name: str,
+    workspace_id: int,
+    user: User,
+    required: WorkspaceMemberRole,
+    service: "WorkspaceService",
+) -> tuple[ResourceT, WorkspaceAccessContext]:
+    if resource is None:
+        raise NotFoundError(resource_name, workspace_id)
+    access = await service.authorize(workspace_id, user, required)
+    return resource, access
 
 
 class WorkspaceService:
@@ -66,10 +81,15 @@ class WorkspaceService:
         await self._workspaces.commit()
         return workspace
 
-    async def list_for_user(self, user: User) -> list[Workspace]:
+    async def list_for_user(self, user: User, pagination: Pagination) -> list[Workspace]:
         if user.role == UserRole.ADMIN:
-            return await self._workspaces.get_all()
-        return await self._workspaces.get_for_user(user.id)
+            return await self._workspaces.get_all(offset=pagination.offset, limit=pagination.limit)
+        return await self._workspaces.get_for_user(
+            user.id, offset=pagination.offset, limit=pagination.limit
+        )
+
+    async def list_all(self, pagination: Pagination) -> list[Workspace]:
+        return await self._workspaces.get_all(offset=pagination.offset, limit=pagination.limit)
 
     async def get(self, workspace_id: int, user: User) -> Workspace:
         return await self.require_role(workspace_id, user, WorkspaceMemberRole.VIEWER)

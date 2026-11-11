@@ -40,10 +40,12 @@ async def client() -> AsyncIterator[AsyncClient]:
         async with maker() as session:
             yield session
 
+    fastapi_app.state.test_sessionmaker = maker
     fastapi_app.dependency_overrides[get_db_session] = override_get_db
     async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as c:
         yield c
     fastapi_app.dependency_overrides.clear()
+    del fastapi_app.state.test_sessionmaker
     await engine.dispose()
 
 

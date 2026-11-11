@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 
-from app.core.exceptions import NotFoundError
+from app.core.constants import PROJECT_ARCHIVED_MESSAGE
+from app.core.exceptions import BadRequestError, NotFoundError
+from app.core.pagination import Pagination
 from app.models.enums import ProjectStatus, WorkspaceMemberRole
 from app.models.project import Project
 from app.models.user import User
@@ -27,8 +29,12 @@ class ProjectService:
             description=payload.description,
         )
 
-    async def list_for_workspace(self, access: WorkspaceAccessContext) -> list[Project]:
-        return await self._projects.list_by_workspace(access.workspace_id)
+    async def list_for_workspace(
+        self, access: WorkspaceAccessContext, pagination: Pagination
+    ) -> list[Project]:
+        return await self._projects.list_by_workspace(
+            access.workspace_id, offset=pagination.offset, limit=pagination.limit
+        )
 
     async def require_project_role(
         self, project_id: int, user: User, required: WorkspaceMemberRole
@@ -43,8 +49,13 @@ class ProjectService:
         return access.project
 
     async def update(self, access: ProjectAccessContext, payload: ProjectUpdate) -> Project:
+        if access.project.status == ProjectStatus.ARCHIVED:
+            raise BadRequestError(PROJECT_ARCHIVED_MESSAGE)
         data = payload.model_dump(exclude_unset=True)
         return await self._projects.update(access.project, data)
 
     async def archive(self, access: ProjectAccessContext) -> Project:
         return await self._projects.update(access.project, {"status": ProjectStatus.ARCHIVED})
+
+    async def delete(self, access: ProjectAccessContext) -> None:
+        await self._projects.delete(access.project)

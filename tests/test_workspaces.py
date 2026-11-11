@@ -37,3 +37,12 @@ async def test_patch_null_name_returns_422(auth_client: AsyncClient) -> None:
 
 async def test_workspaces_require_login(client: AsyncClient) -> None:
     assert (await client.get(BASE)).status_code == 401
+
+
+async def test_workspace_list_supports_pagination(auth_client: AsyncClient) -> None:
+    await auth_client.post(BASE, json={"name": "Team A"})
+    await auth_client.post(BASE, json={"name": "Team B"})
+
+    response = await auth_client.get(f"{BASE}?page=2&limit=1")
+    assert response.status_code == 200
+    assert [workspace["name"] for workspace in response.json()] == ["Team B"]

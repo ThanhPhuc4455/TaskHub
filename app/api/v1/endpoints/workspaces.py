@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status
 
-from app.api.deps import CurrentUser, WorkspaceServiceDep
+from app.api.deps import CurrentUser, PaginationDep, WorkspaceServiceDep
 from app.models.workspace import Workspace
 from app.schemas.workspace import WorkspaceCreate, WorkspaceRead, WorkspaceUpdate
 
@@ -16,9 +16,9 @@ async def create_workspace(
 
 @router.get("", response_model=list[WorkspaceRead])
 async def list_workspaces(
-    service: WorkspaceServiceDep, current_user: CurrentUser
+    service: WorkspaceServiceDep, current_user: CurrentUser, pagination: PaginationDep
 ) -> list[Workspace]:
-    return await service.list_for_user(current_user)
+    return await service.list_for_user(current_user, pagination)
 
 
 @router.get("/{workspace_id}", response_model=WorkspaceRead)

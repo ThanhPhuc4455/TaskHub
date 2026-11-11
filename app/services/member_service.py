@@ -4,6 +4,7 @@ from app.core.constants import (
     CANNOT_REMOVE_OWNER_MESSAGE,
 )
 from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
+from app.core.pagination import Pagination
 from app.models.user import User
 from app.models.workspace_member import WorkspaceMember, WorkspaceMemberRole
 from app.repositories.user_repository import UserRepository
@@ -23,9 +24,13 @@ class MemberService:
         self._members = members
         self._users = users
 
-    async def list_members(self, workspace_id: int, user: User) -> list[WorkspaceMember]:
+    async def list_members(
+        self, workspace_id: int, user: User, pagination: Pagination
+    ) -> list[WorkspaceMember]:
         await self._workspaces.require_role(workspace_id, user, WorkspaceMemberRole.VIEWER)
-        return await self._members.list_by_workspace(workspace_id)
+        return await self._members.list_by_workspace(
+            workspace_id, offset=pagination.offset, limit=pagination.limit
+        )
 
     async def invite(
         self, workspace_id: int, user: User, payload: InviteMemberRequest
@@ -45,7 +50,7 @@ class MemberService:
             workspace_id, user, WorkspaceMemberRole.OWNER
         )
         if target_user_id == workspace.owner_id:
-            raise BadRequestError(CANNOT_CHANGE_OWNER_ROLE_MESSAGE)
+            raise BadRequestError(CANNOT_REMOVE_OWNER_MESSAGE)
         membership = await self._members.get_membership(workspace_id, target_user_id)
         if membership is None:
             raise NotFoundError("Member", target_user_id)
@@ -62,7 +67,7 @@ class MemberService:
             workspace_id, user, WorkspaceMemberRole.OWNER
         )
         if target_user_id == workspace.owner_id:
-            raise BadRequestError(CANNOT_REMOVE_OWNER_MESSAGE)
+            raise BadRequestError(CANNOT_CHANGE_OWNER_ROLE_MESSAGE)
         membership = await self._members.get_membership(workspace_id, target_user_id)
         if membership is None:
             raise NotFoundError("Member", target_user_id)

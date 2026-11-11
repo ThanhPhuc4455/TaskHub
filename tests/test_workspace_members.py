@@ -32,6 +32,21 @@ async def test_creator_is_owner_member(client: AsyncClient) -> None:
     assert members[0]["user_id"] == await user_id_of(client, owner)
 
 
+async def test_member_list_supports_pagination(client: AsyncClient) -> None:
+    owner = await login_as(client, "owner@example.com")
+    viewer = await login_as(client, "viewer@example.com")
+    workspace_id = await create_workspace(client, owner)
+    await invite(client, workspace_id, owner, "viewer@example.com")
+
+    response = await client.get(
+        f"{WS}/{workspace_id}/members?page=2&limit=1",
+        headers=owner,
+    )
+    assert response.status_code == 200
+    assert len(response.json()) == 1
+    assert response.json()[0]["user_id"] == await user_id_of(client, viewer)
+
+
 async def test_viewer_can_read_but_not_modify(client: AsyncClient) -> None:
     owner = await login_as(client, "owner@example.com")
     viewer = await login_as(client, "viewer@example.com")

@@ -2,7 +2,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from app.api.deps import ProjectServiceDep, require_project_role, require_workspace_role
+from app.api.deps import (
+    PaginationDep,
+    ProjectServiceDep,
+    require_project_role,
+    require_workspace_role,
+)
 from app.models.enums import WorkspaceMemberRole
 from app.models.project import Project
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
@@ -52,8 +57,12 @@ async def create_project(
     response_model=list[ProjectRead],
     summary="List workspace projects",
 )
-async def list_projects(access: WorkspaceViewer, service: ProjectServiceDep) -> list[Project]:
-    return await service.list_for_workspace(access)
+async def list_projects(
+    access: WorkspaceViewer,
+    service: ProjectServiceDep,
+    pagination: PaginationDep,
+) -> list[Project]:
+    return await service.list_for_workspace(access, pagination)
 
 
 @router.get("/projects/{project_id}", response_model=ProjectRead, summary="Get a project")
@@ -77,3 +86,8 @@ async def update_project(
 )
 async def archive_project(access: ProjectOwner, service: ProjectServiceDep) -> Project:
     return await service.archive(access)
+
+
+@router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_project(access: ProjectOwner, service: ProjectServiceDep) -> None:
+    await service.delete(access)
