@@ -1,3 +1,5 @@
+from sqlalchemy.exc import IntegrityError
+
 from app.core.constants import (
     EMAIL_TAKEN_MESSAGE,
     INACTIVE_USER_MESSAGE,
@@ -6,7 +8,7 @@ from app.core.constants import (
 )
 from app.core.exceptions import AuthenticationError, ConflictError
 from app.core.security import (
-    REFRESH,
+    TokenType,
     create_access_token,
     create_refresh_token,
     decode_token,
@@ -25,14 +27,16 @@ class AuthService:
         self._tokens = tokens
 
     async def register(self, payload: RegisterRequest) -> User:
-        if await self._users.get_by_email(payload.email) is not None:
-            raise ConflictError(EMAIL_TAKEN_MESSAGE)
         hashed_password = await hash_password(payload.password)
-        return await self._users.create(
-            email=payload.email,
-            full_name=payload.full_name,
-            hashed_password=hashed_password,
-        )
+        try:
+            return await self._users.create(
+                email=payload.email,
+                full_name=payload.full_name,
+                hashed_password=hashed_password,
+            )
+        except IntegrityError as exc:
+            await self._users.rollback()
+            raise ConflictError(EMAIL_TAKEN_MESSAGE) from exc
 
     async def login(self, email: str, password: str) -> TokenResponse:
         user = await self._users.get_by_email(email.lower())
@@ -43,7 +47,7 @@ class AuthService:
         return await self._issue_tokens(user.id)
 
     async def refresh(self, refresh_token: str) -> TokenResponse:
-        payload = decode_token(refresh_token, REFRESH)
+        payload = decode_token(refresh_token, TokenType.REFRESH)
         stored = await self._tokens.get_by_jti(payload.jti)
         if stored is None:
             raise AuthenticationError(INVALID_TOKEN_MESSAGE)
@@ -61,7 +65,7 @@ class AuthService:
         return tokens
 
     async def logout(self, refresh_token: str) -> None:
-        payload = decode_token(refresh_token, REFRESH)
+        payload = decode_token(refresh_token, TokenType.REFRESH)
         stored = await self._tokens.get_by_jti(payload.jti)
         if stored is None:
             raise AuthenticationError(INVALID_TOKEN_MESSAGE)
