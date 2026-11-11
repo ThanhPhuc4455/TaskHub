@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from app.core.constants import FORBIDDEN_MESSAGE
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.models.user import User, UserRole
@@ -8,25 +10,48 @@ from app.repositories.workspace_repository import WorkspaceRepository
 from app.schemas.workspace import WorkspaceCreate, WorkspaceUpdate
 
 
+@dataclass(frozen=True)
+class WorkspaceAccessContext:
+    workspace_id: int
+    user: User
+    effective_role: WorkspaceMemberRole
+    workspace: Workspace
+
+
 class WorkspaceService:
     def __init__(self, workspaces: WorkspaceRepository, members: WorkspaceMemberRepository) -> None:
         self._workspaces = workspaces
         self._members = members
 
-    async def require_role(
+    async def authorize(
         self, workspace_id: int, user: User, required: WorkspaceMemberRole
-    ) -> Workspace:
+    ) -> WorkspaceAccessContext:
         workspace = await self._workspaces.get(workspace_id)
         if workspace is None:
             raise NotFoundError("Workspace", workspace_id)
         if user.role == UserRole.ADMIN:
-            return workspace
+            return WorkspaceAccessContext(
+                workspace_id=workspace_id,
+                user=user,
+                effective_role=WorkspaceMemberRole.OWNER,
+                workspace=workspace,
+            )
         membership = await self._members.get_membership(workspace_id, user.id)
         if membership is None:
             raise NotFoundError("Workspace", workspace_id)
         if membership.role.rank < required.rank:
             raise ForbiddenError(FORBIDDEN_MESSAGE)
-        return workspace
+        return WorkspaceAccessContext(
+            workspace_id=workspace_id,
+            user=user,
+            effective_role=membership.role,
+            workspace=workspace,
+        )
+
+    async def require_role(
+        self, workspace_id: int, user: User, required: WorkspaceMemberRole
+    ) -> Workspace:
+        return (await self.authorize(workspace_id, user, required)).workspace
 
     async def create(self, payload: WorkspaceCreate, owner_id: int) -> Workspace:
         workspace = await self._workspaces.create(

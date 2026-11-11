@@ -1,4 +1,5 @@
-from typing import Annotated
+from collections.abc import Callable
+from typing import Annotated, Any
 
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
@@ -7,17 +8,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.constants import INVALID_TOKEN_MESSAGE
 from app.core.database import get_db_session
-from app.core.exceptions import AuthenticationError
+from app.core.exceptions import AuthenticationError, NotFoundError
 from app.core.security import ACCESS, decode_token
+from app.models.enums import WorkspaceMemberRole
 from app.models.user import User
+from app.repositories.project_repository import ProjectRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.workspace_member_repository import WorkspaceMemberRepository
 from app.repositories.workspace_repository import WorkspaceRepository
 from app.services.auth_service import AuthService
 from app.services.member_service import MemberService
+from app.services.project_service import ProjectAccessContext, ProjectService
 from app.services.user_service import UserService
-from app.services.workspace_service import WorkspaceService
+from app.services.workspace_service import WorkspaceAccessContext, WorkspaceService
 
 
 def get_workspace_repository(
@@ -40,6 +44,22 @@ def get_workspace_service(
 
 
 WorkspaceServiceDep = Annotated[WorkspaceService, Depends(get_workspace_service)]
+
+
+def get_project_repository(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> ProjectRepository:
+    return ProjectRepository(session)
+
+
+def get_project_service(
+    projects: Annotated[ProjectRepository, Depends(get_project_repository)],
+    workspaces: WorkspaceServiceDep,
+) -> ProjectService:
+    return ProjectService(projects, workspaces)
+
+
+ProjectServiceDep = Annotated[ProjectService, Depends(get_project_service)]
 
 
 def get_user_repository(
@@ -98,3 +118,30 @@ def get_user_service(
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
+
+
+def require_workspace_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
+    async def dependency(
+        workspace_id: int,
+        service: WorkspaceServiceDep,
+        current_user: CurrentUser,
+    ) -> WorkspaceAccessContext:
+        return await service.authorize(workspace_id, current_user, required)
+
+    return dependency
+
+
+def require_project_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
+    async def dependency(
+        project_id: int,
+        projects: Annotated[ProjectRepository, Depends(get_project_repository)],
+        workspaces: WorkspaceServiceDep,
+        current_user: CurrentUser,
+    ) -> ProjectAccessContext:
+        project = await projects.get(project_id)
+        if project is None:
+            raise NotFoundError("Project", project_id)
+        workspace = await workspaces.authorize(project.workspace_id, current_user, required)
+        return ProjectAccessContext(project=project, workspace=workspace)
+
+    return dependency
