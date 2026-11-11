@@ -1,10 +1,14 @@
-from app.core.constants import ALREADY_MEMBER_MESSAGE, CANNOT_REMOVE_OWNER_MESSAGE
+from app.core.constants import (
+    ALREADY_MEMBER_MESSAGE,
+    CANNOT_CHANGE_OWNER_ROLE_MESSAGE,
+    CANNOT_REMOVE_OWNER_MESSAGE,
+)
 from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.models.user import User
 from app.models.workspace_member import WorkspaceMember, WorkspaceMemberRole
 from app.repositories.user_repository import UserRepository
 from app.repositories.workspace_member_repository import WorkspaceMemberRepository
-from app.schemas.member import InviteMemberRequest
+from app.schemas.member import InviteMemberRequest, UpdateMemberRoleRequest
 from app.services.workspace_service import WorkspaceService
 
 
@@ -41,8 +45,25 @@ class MemberService:
             workspace_id, user, WorkspaceMemberRole.OWNER
         )
         if target_user_id == workspace.owner_id:
-            raise BadRequestError(CANNOT_REMOVE_OWNER_MESSAGE)
+            raise BadRequestError(CANNOT_CHANGE_OWNER_ROLE_MESSAGE)
         membership = await self._members.get_membership(workspace_id, target_user_id)
         if membership is None:
             raise NotFoundError("Member", target_user_id)
         await self._members.delete(membership)
+
+    async def update_role(
+        self,
+        workspace_id: int,
+        user: User,
+        target_user_id: int,
+        payload: UpdateMemberRoleRequest,
+    ) -> WorkspaceMember:
+        workspace = await self._workspaces.require_role(
+            workspace_id, user, WorkspaceMemberRole.OWNER
+        )
+        if target_user_id == workspace.owner_id:
+            raise BadRequestError(CANNOT_REMOVE_OWNER_MESSAGE)
+        membership = await self._members.get_membership(workspace_id, target_user_id)
+        if membership is None:
+            raise NotFoundError("Member", target_user_id)
+        return await self._members.update(membership, {"role": payload.role})

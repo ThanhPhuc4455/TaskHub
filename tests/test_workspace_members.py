@@ -95,3 +95,43 @@ async def test_cannot_remove_owner(client: AsyncClient) -> None:
     owner_id = await user_id_of(client, owner)
     response = await client.delete(f"{WS}/{workspace_id}/members/{owner_id}", headers=owner)
     assert response.status_code == 400
+
+
+async def test_only_owner_can_change_member_role(client: AsyncClient) -> None:
+    owner = await login_as(client, "owner@example.com")
+    editor = await login_as(client, "editor@example.com")
+    viewer = await login_as(client, "viewer@example.com")
+    workspace_id = await create_workspace(client, owner)
+    await invite(client, workspace_id, owner, "editor@example.com", role="EDITOR")
+    await invite(client, workspace_id, owner, "viewer@example.com", role="VIEWER")
+
+    viewer_id = await user_id_of(client, viewer)
+    forbidden = await client.patch(
+        f"{WS}/{workspace_id}/members/{viewer_id}",
+        json={"role": "EDITOR"},
+        headers=editor,
+    )
+    assert forbidden.status_code == 403
+
+    updated = await client.patch(
+        f"{WS}/{workspace_id}/members/{viewer_id}",
+        json={"role": "EDITOR"},
+        headers=owner,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["role"] == "EDITOR"
+
+
+async def test_member_role_cannot_be_changed_to_owner(client: AsyncClient) -> None:
+    owner = await login_as(client, "owner@example.com")
+    viewer = await login_as(client, "viewer@example.com")
+    workspace_id = await create_workspace(client, owner)
+    await invite(client, workspace_id, owner, "viewer@example.com")
+    viewer_id = await user_id_of(client, viewer)
+
+    response = await client.patch(
+        f"{WS}/{workspace_id}/members/{viewer_id}",
+        json={"role": "OWNER"},
+        headers=owner,
+    )
+    assert response.status_code == 422

@@ -16,6 +16,17 @@ class InviteMemberRequest(BaseSchema):
         return value
 
 
+class UpdateMemberRoleRequest(BaseSchema):
+    role: WorkspaceMemberRole
+
+    @field_validator("role")
+    @classmethod
+    def cannot_assign_owner(cls, value: WorkspaceMemberRole) -> WorkspaceMemberRole:
+        if value == WorkspaceMemberRole.OWNER:
+            raise ValueError("cannot assign OWNER role")
+        return value
+
+
 class MemberRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
