@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-for-pytest-only-0123456789")
@@ -7,6 +8,7 @@ from collections.abc import AsyncIterator
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -23,6 +25,13 @@ async def client() -> AsyncIterator[AsyncClient]:
         poolclass=StaticPool,
         connect_args={"check_same_thread": False},
     )
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def enable_sqlite_foreign_keys(dbapi_connection: Any, _: Any) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
@@ -36,3 +45,14 @@ async def client() -> AsyncIterator[AsyncClient]:
         yield c
     app.dependency_overrides.clear()
     await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def auth_client(client: AsyncClient) -> AsyncClient:
+    user = {"email": "owner@example.com", "password": "password123", "full_name": "Owner"}
+    await client.post("/api/v1/auth/register", json=user)
+    response = await client.post(
+        "/api/v1/auth/login", data={"username": user["email"], "password": user["password"]}
+    )
+    client.headers["Authorization"] = f"Bearer {response.json()['access_token']}"
+    return client
