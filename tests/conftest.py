@@ -14,7 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 import app.models  # noqa: F401
 from app.core.database import get_db_session
-from app.main import app
+from app.main import app as fastapi_app
 from app.models.base import Base
 
 
@@ -40,10 +40,10 @@ async def client() -> AsyncIterator[AsyncClient]:
         async with maker() as session:
             yield session
 
-    app.dependency_overrides[get_db_session] = override_get_db
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+    fastapi_app.dependency_overrides[get_db_session] = override_get_db
+    async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as c:
         yield c
-    app.dependency_overrides.clear()
+    fastapi_app.dependency_overrides.clear()
     await engine.dispose()
 
 
