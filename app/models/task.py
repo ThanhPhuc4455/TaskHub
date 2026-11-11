@@ -1,30 +1,19 @@
-import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.constants import ENUM_MAX_LENGTH, TASK_TITLE_MAX_LENGTH
 from app.models.base import Base
+from app.models.enums import TaskPriority, TaskStatus
+
+__all__ = ["Task", "TaskPriority", "TaskStatus"]
 
 if TYPE_CHECKING:
     from app.models.comment import Comment
     from app.models.label import Label
     from app.models.project import Project
-
-
-class TaskStatus(enum.StrEnum):
-    TODO = "TODO"
-    IN_PROGRESS = "IN_PROGRESS"
-    IN_REVIEW = "IN_REVIEW"
-    DONE = "DONE"
-
-
-class TaskPriority(enum.StrEnum):
-    LOW = "LOW"
-    MEDIUM = "MEDIUM"
-    HIGH = "HIGH"
-    URGENT = "URGENT"
 
 
 class Task(Base):
@@ -44,19 +33,31 @@ class Task(Base):
         nullable=True,
     )
 
-    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    title: Mapped[str] = mapped_column(String(TASK_TITLE_MAX_LENGTH), nullable=False)
 
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     status: Mapped[TaskStatus] = mapped_column(
-        Enum(TaskStatus, name="task_status", native_enum=False, length=20),
+        Enum(
+            TaskStatus,
+            name="task_status",
+            native_enum=False,
+            length=ENUM_MAX_LENGTH,
+            create_constraint=True,
+        ),
         default=TaskStatus.TODO,
         index=True,
         nullable=False,
     )
 
     priority: Mapped[TaskPriority] = mapped_column(
-        Enum(TaskPriority, name="task_priority", native_enum=False, length=20),
+        Enum(
+            TaskPriority,
+            name="task_priority",
+            native_enum=False,
+            length=ENUM_MAX_LENGTH,
+            create_constraint=True,
+        ),
         default=TaskPriority.MEDIUM,
         nullable=False,
     )
@@ -67,7 +68,8 @@ class Task(Base):
     )
 
     created_by: Mapped[int] = mapped_column(
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        index=True,
         nullable=False,
     )
 

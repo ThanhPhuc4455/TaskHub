@@ -1,17 +1,31 @@
 WORKSPACE_NAME_MIN_LENGTH = 1
 WORKSPACE_NAME_MAX_LENGTH = 100
-
-NOT_FOUND_MESSAGE = "{resource} {resource_id} not found"
-
+PROJECT_NAME_MAX_LENGTH = 150
+PROJECT_NAME_MIN_LENGTH = 1
+TASK_TITLE_MAX_LENGTH = 200
+LABEL_NAME_MAX_LENGTH = 50
+COLOR_MAX_LENGTH = 7
+ENUM_MAX_LENGTH = 20
 EMAIL_MAX_LENGTH = 255
 FULL_NAME_MIN_LENGTH = 1
 FULL_NAME_MAX_LENGTH = 150
 PASSWORD_MIN_LENGTH = 8
 PASSWORD_MAX_LENGTH = 64
 PASSWORD_MAX_BYTES = 72
+PASSWORD_HASH_MAX_LENGTH = 255
+JTI_MAX_LENGTH = 32
+REFRESH_TOKEN_CLEANUP_INTERVAL_SECONDS = 3600
+
+NOT_FOUND_MESSAGE = "{resource} {resource_id} not found"
 
 EMAIL_TAKEN_MESSAGE = "Email already registered"
 INVALID_CREDENTIALS_MESSAGE = "Incorrect email or password"
 INACTIVE_USER_MESSAGE = "Inactive user"
 INVALID_TOKEN_MESSAGE = "Invalid or expired token"
 WRONG_TOKEN_TYPE_MESSAGE = "Invalid token type"
+WRONG_PASSWORD_MESSAGE = "Current password is incorrect"
+FORBIDDEN_MESSAGE = "You do not have permission to perform this action"
+ALREADY_MEMBER_MESSAGE = "User is already a member of this workspace"
+CANNOT_REMOVE_OWNER_MESSAGE = "The workspace owner cannot be removed"
+CANNOT_CHANGE_OWNER_ROLE_MESSAGE = "The workspace owner's role cannot be changed"
+PROJECT_ARCHIVED_MESSAGE = "Archived projects cannot be modified"
