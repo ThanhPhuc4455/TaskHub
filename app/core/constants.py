@@ -1,8 +1,6 @@
 WORKSPACE_NAME_MIN_LENGTH = 1
 WORKSPACE_NAME_MAX_LENGTH = 100
 
-NOT_FOUND_MESSAGE = "{resource} {resource_id} not found"
-
 EMAIL_MAX_LENGTH = 255
 FULL_NAME_MIN_LENGTH = 1
 FULL_NAME_MAX_LENGTH = 150
@@ -12,12 +10,3 @@ PASSWORD_MAX_BYTES = 72
 PASSWORD_HASH_MAX_LENGTH = 255
 JTI_MAX_LENGTH = 32
 REFRESH_TOKEN_CLEANUP_INTERVAL_SECONDS = 3600
-
-NOT_FOUND_MESSAGE = "{resource} {resource_id} not found"
-
-EMAIL_TAKEN_MESSAGE = "Email already registered"
-INVALID_CREDENTIALS_MESSAGE = "Incorrect email or password"
-INACTIVE_USER_MESSAGE = "Inactive user"
-INVALID_TOKEN_MESSAGE = "Invalid or expired token"
-WRONG_TOKEN_TYPE_MESSAGE = "Invalid token type"
-WRONG_PASSWORD_MESSAGE = "Current password is incorrect"

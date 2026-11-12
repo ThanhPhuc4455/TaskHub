@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.refresh_token import RefreshToken
@@ -37,13 +37,8 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
         await self._flush_or_commit(commit)
         return int(getattr(result, "rowcount", 0) or 0)
 
-    async def delete_expired_or_revoked(self) -> int:
-        stmt = delete(RefreshToken).where(
-            or_(
-                RefreshToken.revoked.is_(True),
-                RefreshToken.expires_at <= datetime.now(UTC),
-            )
-        )
+    async def delete_expired(self) -> int:
+        stmt = delete(RefreshToken).where(RefreshToken.expires_at <= datetime.now(UTC))
         result = await self.session.execute(stmt)
         await self.commit()
         return int(getattr(result, "rowcount", 0) or 0)

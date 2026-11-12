@@ -1,12 +1,14 @@
-from app.core.constants import (
+from sqlalchemy.exc import IntegrityError
+
+from app.core.exceptions import AuthenticationError, ConflictError
+from app.core.messages import (
     EMAIL_TAKEN_MESSAGE,
     INACTIVE_USER_MESSAGE,
     INVALID_CREDENTIALS_MESSAGE,
     INVALID_TOKEN_MESSAGE,
 )
-from app.core.exceptions import AuthenticationError, ConflictError
 from app.core.security import (
-    REFRESH,
+    TokenType,
     create_access_token,
     create_refresh_token,
     decode_token,
@@ -17,6 +19,7 @@ from app.models.user import User
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import RegisterRequest, TokenResponse
+from app.services.user_context import resolve_active_user
 
 
 class AuthService:
@@ -25,14 +28,16 @@ class AuthService:
         self._tokens = tokens
 
     async def register(self, payload: RegisterRequest) -> User:
-        if await self._users.get_by_email(payload.email) is not None:
-            raise ConflictError(EMAIL_TAKEN_MESSAGE)
         hashed_password = await hash_password(payload.password)
-        return await self._users.create(
-            email=payload.email,
-            full_name=payload.full_name,
-            hashed_password=hashed_password,
-        )
+        try:
+            return await self._users.create(
+                email=payload.email,
+                full_name=payload.full_name,
+                hashed_password=hashed_password,
+            )
+        except IntegrityError as exc:
+            await self._users.rollback()
+            raise ConflictError(EMAIL_TAKEN_MESSAGE) from exc
 
     async def login(self, email: str, password: str) -> TokenResponse:
         user = await self._users.get_by_email(email.lower())
@@ -43,7 +48,7 @@ class AuthService:
         return await self._issue_tokens(user.id)
 
     async def refresh(self, refresh_token: str) -> TokenResponse:
-        payload = decode_token(refresh_token, REFRESH)
+        payload = decode_token(refresh_token, TokenType.REFRESH)
         stored = await self._tokens.get_by_jti(payload.jti)
         if stored is None:
             raise AuthenticationError(INVALID_TOKEN_MESSAGE)
@@ -53,15 +58,13 @@ class AuthService:
         if not await self._tokens.claim_for_rotation(payload.jti, commit=False):
             await self._tokens.revoke_all_for_user(payload.user_id)
             raise AuthenticationError(INVALID_TOKEN_MESSAGE)
-        user = await self._users.get(payload.user_id)
-        if user is None or not user.is_active:
-            raise AuthenticationError(INVALID_TOKEN_MESSAGE)
+        user = await resolve_active_user(payload.user_id, self._users)
         tokens = await self._issue_tokens(user.id, commit=False)
         await self._tokens.commit()
         return tokens
 
     async def logout(self, refresh_token: str) -> None:
-        payload = decode_token(refresh_token, REFRESH)
+        payload = decode_token(refresh_token, TokenType.REFRESH)
         stored = await self._tokens.get_by_jti(payload.jti)
         if stored is None:
             raise AuthenticationError(INVALID_TOKEN_MESSAGE)

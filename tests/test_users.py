@@ -43,6 +43,12 @@ async def test_change_password(auth_client: AsyncClient) -> None:
     )
     assert login.status_code == 200
 
+    old_password_login = await auth_client.post(
+        "/api/v1/auth/login",
+        data={"username": "owner@example.com", "password": "password123"},
+    )
+    assert old_password_login.status_code == 401
+
 
 async def test_change_password_revokes_refresh_tokens(auth_client: AsyncClient) -> None:
     login = await auth_client.post(

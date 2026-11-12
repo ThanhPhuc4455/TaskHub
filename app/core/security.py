@@ -1,4 +1,5 @@
 import asyncio
+import enum
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -7,11 +8,14 @@ import bcrypt
 import jwt
 
 from app.core.config import settings
-from app.core.constants import INVALID_TOKEN_MESSAGE, PASSWORD_MAX_BYTES, WRONG_TOKEN_TYPE_MESSAGE
+from app.core.constants import PASSWORD_MAX_BYTES
 from app.core.exceptions import AuthenticationError
+from app.core.messages import INVALID_TOKEN_MESSAGE, WRONG_TOKEN_TYPE_MESSAGE
 
-ACCESS = "access"
-REFRESH = "refresh"
+
+class TokenType(enum.StrEnum):
+    ACCESS = "access"
+    REFRESH = "refresh"
 
 
 @dataclass(frozen=True)
@@ -55,14 +59,16 @@ def _issue(user_id: int, token_type: str, lifetime: timedelta) -> IssuedToken:
 
 
 def create_access_token(user_id: int) -> IssuedToken:
-    return _issue(user_id, ACCESS, timedelta(minutes=settings.access_token_expire_minutes))
+    return _issue(
+        user_id, TokenType.ACCESS, timedelta(minutes=settings.access_token_expire_minutes)
+    )
 
 
 def create_refresh_token(user_id: int) -> IssuedToken:
-    return _issue(user_id, REFRESH, timedelta(days=settings.refresh_token_expire_days))
+    return _issue(user_id, TokenType.REFRESH, timedelta(days=settings.refresh_token_expire_days))
 
 
-def decode_token(token: str, expected_type: str) -> TokenPayload:
+def decode_token(token: str, expected_type: TokenType) -> TokenPayload:
     try:
         payload = jwt.decode(
             token,
@@ -70,8 +76,11 @@ def decode_token(token: str, expected_type: str) -> TokenPayload:
             algorithms=[settings.jwt_algorithm],
             options={"require": ["exp", "sub", "type", "jti"]},
         )
-    except jwt.InvalidTokenError as exc:
+    except (jwt.InvalidTokenError, KeyError, TypeError, ValueError) as exc:
         raise AuthenticationError(INVALID_TOKEN_MESSAGE) from exc
-    if payload["type"] != expected_type:
+    if payload.get("type") != expected_type:
         raise AuthenticationError(WRONG_TOKEN_TYPE_MESSAGE)
-    return TokenPayload(user_id=int(payload["sub"]), jti=payload["jti"])
+    try:
+        return TokenPayload(user_id=int(payload["sub"]), jti=str(payload["jti"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise AuthenticationError(INVALID_TOKEN_MESSAGE) from exc
