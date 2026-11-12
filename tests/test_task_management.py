@@ -97,6 +97,8 @@ async def test_labels_and_comments_enforce_project_and_comment_rules(
 ) -> None:
     owner = await login_as(client, "content-owner@example.com")
     editor = await login_as(client, "content-editor@example.com")
+    viewer = await login_as(client, "content-viewer@example.com")
+    other = await login_as(client, "content-other@example.com")
     project_id = await project_for(client, owner, "Content workspace")
     project = await client.get(f"/api/v1/projects/{project_id}", headers=owner)
     workspace_id = project.json()["workspace_id"]
@@ -106,6 +108,16 @@ async def test_labels_and_comments_enforce_project_and_comment_rules(
         headers=owner,
     )
     assert invited.status_code == 201
+    for email, role in (
+        ("content-viewer@example.com", "VIEWER"),
+        ("content-other@example.com", "EDITOR"),
+    ):
+        invited = await client.post(
+            f"{WS}/{workspace_id}/members",
+            json={"email": email, "role": role},
+            headers=owner,
+        )
+        assert invited.status_code == 201
 
     task = await client.post(
         f"/api/v1/projects/{project_id}/tasks",
@@ -121,11 +133,24 @@ async def test_labels_and_comments_enforce_project_and_comment_rules(
     )
     assert label.status_code == 201
     label_id = label.json()["id"]
+    viewer_label = await client.post(
+        f"/api/v1/projects/{project_id}/labels",
+        json={"name": "viewer-label"},
+        headers=viewer,
+    )
+    assert viewer_label.status_code == 403
     assert (
         await client.post(f"/api/v1/tasks/{task_id}/labels/{label_id}", headers=editor)
     ).status_code == 204
     duplicate = await client.post(f"/api/v1/tasks/{task_id}/labels/{label_id}", headers=editor)
     assert duplicate.status_code == 409
+    assert (
+        await client.delete(f"/api/v1/tasks/{task_id}/labels/{label_id}", headers=editor)
+    ).status_code == 204
+    missing_detach = await client.delete(
+        f"/api/v1/tasks/{task_id}/labels/{label_id}", headers=editor
+    )
+    assert missing_detach.status_code == 404
 
     comment = await client.post(
         f"/api/v1/tasks/{task_id}/comments",
@@ -136,8 +161,27 @@ async def test_labels_and_comments_enforce_project_and_comment_rules(
     comment_id = comment.json()["id"]
     assert comment.json()["author"]["email"] == "content-editor@example.com"
 
-    other = await login_as(client, "content-other@example.com")
+    viewer_comment = await client.post(
+        f"/api/v1/tasks/{task_id}/comments",
+        json={"content": "viewer cannot comment"},
+        headers=viewer,
+    )
+    assert viewer_comment.status_code == 403
     denied = await client.delete(f"/api/v1/tasks/{task_id}/comments/{comment_id}", headers=other)
-    assert denied.status_code == 404
-    deleted = await client.delete(f"/api/v1/tasks/{task_id}/comments/{comment_id}", headers=editor)
+    assert denied.status_code == 403
+    owner_deleted = await client.delete(
+        f"/api/v1/tasks/{task_id}/comments/{comment_id}", headers=owner
+    )
+    assert owner_deleted.status_code == 204
+
+    editor_comment = await client.post(
+        f"/api/v1/tasks/{task_id}/comments",
+        json={"content": "editor comment"},
+        headers=editor,
+    )
+    assert editor_comment.status_code == 201
+    deleted = await client.delete(
+        f"/api/v1/tasks/{task_id}/comments/{editor_comment.json()['id']}",
+        headers=editor,
+    )
     assert deleted.status_code == 204

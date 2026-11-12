@@ -5,6 +5,7 @@ from sqlalchemy import delete, func, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.pagination import Pagination
 from app.models.label import task_labels
 from app.models.task import Task, TaskPriority, TaskStatus
 from app.repositories.base import BaseRepository
@@ -12,8 +13,8 @@ from app.repositories.base import BaseRepository
 
 @dataclass(frozen=True)
 class TaskFilters:
-    status: TaskStatus | None = None
-    priority: TaskPriority | None = None
+    status: list[TaskStatus] | None = None
+    priority: list[TaskPriority] | None = None
     assignee_id: int | None = None
 
 
@@ -29,10 +30,10 @@ class TaskRepository(BaseRepository[Task]):
 
     def _where(self, project_id: int, filters: TaskFilters) -> list[Any]:
         conditions = [Task.project_id == project_id]
-        if filters.status is not None:
-            conditions.append(Task.status == filters.status)
-        if filters.priority is not None:
-            conditions.append(Task.priority == filters.priority)
+        if filters.status:
+            conditions.append(Task.status.in_(filters.status))
+        if filters.priority:
+            conditions.append(Task.priority.in_(filters.priority))
         if filters.assignee_id is not None:
             conditions.append(Task.assignee_id == filters.assignee_id)
         return conditions
@@ -45,7 +46,7 @@ class TaskRepository(BaseRepository[Task]):
         )
 
     async def list_by_project(
-        self, project_id: int, filters: TaskFilters, *, offset: int, limit: int
+        self, project_id: int, filters: TaskFilters, pagination: Pagination
     ) -> TaskPage:
         conditions = self._where(project_id, filters)
         total = await self.session.scalar(select(func.count()).select_from(Task).where(*conditions))
@@ -54,8 +55,8 @@ class TaskRepository(BaseRepository[Task]):
             .where(*conditions)
             .options(selectinload(Task.labels), selectinload(Task.assignee))
             .order_by(Task.created_at.desc(), Task.id.desc())
-            .offset(offset)
-            .limit(limit)
+            .offset(pagination.offset)
+            .limit(pagination.limit)
         )
         result = await self.session.scalars(stmt)
         return TaskPage(items=list(result.all()), total=total or 0)

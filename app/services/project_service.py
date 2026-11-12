@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 
-from app.core.constants import PROJECT_ARCHIVED_MESSAGE
-from app.core.exceptions import BadRequestError, NotFoundError
+from app.core.exceptions import NotFoundError
 from app.core.pagination import Pagination
 from app.models.enums import ProjectStatus, WorkspaceMemberRole
 from app.models.project import Project
 from app.models.user import User
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectUpdate
+from app.services.policies import ensure_project_active
 from app.services.workspace_service import WorkspaceAccessContext, WorkspaceService
 
 
@@ -49,8 +49,7 @@ class ProjectService:
         return access.project
 
     async def update(self, access: ProjectAccessContext, payload: ProjectUpdate) -> Project:
-        if access.project.status == ProjectStatus.ARCHIVED:
-            raise BadRequestError(PROJECT_ARCHIVED_MESSAGE)
+        ensure_project_active(access.project)
         data = payload.model_dump(exclude_unset=True)
         return await self._projects.update(access.project, data)
 

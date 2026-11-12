@@ -6,7 +6,12 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.constants import FORBIDDEN_MESSAGE, INVALID_TOKEN_MESSAGE
+from app.core.constants import (
+    DEFAULT_PAGE_SIZE,
+    FORBIDDEN_MESSAGE,
+    INVALID_TOKEN_MESSAGE,
+    MAX_PAGE_SIZE,
+)
 from app.core.database import get_db_session
 from app.core.exceptions import AuthenticationError, ForbiddenError, NotFoundError
 from app.core.pagination import Pagination
@@ -31,7 +36,6 @@ from app.services.user_service import UserService
 from app.services.workspace_service import (
     WorkspaceAccessContext,
     WorkspaceService,
-    authorize_resource,
 )
 
 
@@ -43,7 +47,7 @@ def get_workspace_repository(
 
 def get_pagination(
     page: int = Query(1, ge=1),
-    limit: int = Query(100, ge=1, le=100),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
 ) -> Pagination:
     return Pagination(page=page, limit=limit)
 
@@ -208,23 +212,26 @@ def require_workspace_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
 def require_project_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
     async def dependency(
         project_id: int,
-        projects: Annotated[ProjectRepository, Depends(get_project_repository)],
-        workspaces: WorkspaceServiceDep,
+        service: ProjectServiceDep,
         current_user: CurrentUser,
     ) -> ProjectAccessContext:
-        project = await projects.get(project_id)
-        project, workspace = await authorize_resource(
-            project,
-            "Project",
-            project.workspace_id if project is not None else project_id,
-            current_user,
-            required,
-            workspaces,
-        )
-        assert project is not None
-        return ProjectAccessContext(project=project, workspace=workspace)
+        return await service.require_project_role(project_id, current_user, required)
 
     return dependency
+
+
+async def _resolve_project_access(
+    project: Any,
+    resource_name: str,
+    resource_id: int,
+    required: WorkspaceMemberRole,
+    current_user: User,
+    workspaces: WorkspaceService,
+) -> ProjectAccessContext:
+    if project is None:
+        raise NotFoundError(resource_name, resource_id)
+    workspace = await workspaces.authorize(project.workspace_id, current_user, required)
+    return ProjectAccessContext(project=project, workspace=workspace)
 
 
 def require_task_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
@@ -239,16 +246,14 @@ def require_task_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
         if task is None:
             raise NotFoundError("Task", task_id)
         project = await projects.get(task.project_id)
-        project, workspace = await authorize_resource(
-            project,
-            "Project",
-            project.workspace_id if project is not None else task.project_id,
-            current_user,
-            required,
-            workspaces,
+        project_access = await _resolve_project_access(
+            project, "Project", task.project_id, required, current_user, workspaces
         )
-        assert project is not None
-        return TaskAccessContext(task=task, project=project, workspace=workspace)
+        return TaskAccessContext(
+            task=task,
+            project=project_access.project,
+            workspace=project_access.workspace,
+        )
 
     return dependency
 
@@ -265,16 +270,14 @@ def require_label_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
         if label is None:
             raise NotFoundError("Label", label_id)
         project = await projects.get(label.project_id)
-        project, workspace = await authorize_resource(
-            project,
-            "Project",
-            project.workspace_id if project is not None else label.project_id,
-            current_user,
-            required,
-            workspaces,
+        project_access = await _resolve_project_access(
+            project, "Project", label.project_id, required, current_user, workspaces
         )
-        assert project is not None
-        return LabelAccessContext(label=label, project=project, workspace=workspace)
+        return LabelAccessContext(
+            label=label,
+            project=project_access.project,
+            workspace=project_access.workspace,
+        )
 
     return dependency
 
@@ -290,26 +293,22 @@ def require_comment_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
         current_user: CurrentUser,
     ) -> CommentAccessContext:
         comment = await comments.get_with_author(comment_id)
-        if comment is None:
-            raise NotFoundError("Comment", comment_id)
-        if comment.task_id != task_id:
+        if comment is None or comment.task_id != task_id:
             raise NotFoundError("Comment", comment_id)
         task = await tasks.get_with_details(comment.task_id)
         if task is None:
             raise NotFoundError("Task", comment.task_id)
         project = await projects.get(task.project_id)
-        project, workspace = await authorize_resource(
-            project,
-            "Project",
-            project.workspace_id if project is not None else task.project_id,
-            current_user,
-            required,
-            workspaces,
+        project_access = await _resolve_project_access(
+            project, "Project", task.project_id, required, current_user, workspaces
         )
-        assert project is not None
         return CommentAccessContext(
             comment=comment,
-            task=TaskAccessContext(task=task, project=project, workspace=workspace),
+            task=TaskAccessContext(
+                task=task,
+                project=project_access.project,
+                workspace=project_access.workspace,
+            ),
         )
 
     return dependency

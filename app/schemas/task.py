@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, PositiveInt, field_validator
 
 from app.core.constants import TASK_TITLE_MAX_LENGTH, TASK_TITLE_MIN_LENGTH
 from app.models.enums import TaskPriority, TaskStatus
@@ -14,19 +14,35 @@ class TaskCreate(BaseSchema):
     description: str | None = None
     status: TaskStatus = TaskStatus.TODO
     priority: TaskPriority = TaskPriority.MEDIUM
-    assignee_id: int | None = None
+    assignee_id: PositiveInt | None = None
     due_date: datetime | None = None
+
+    @field_validator("due_date")
+    @classmethod
+    def due_date_must_be_in_future(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value <= datetime.now(UTC):
+            raise ValueError("due_date must be in the future")
+        return value
 
 
 class TaskUpdate(BasePatchSchema):
     nullable_fields = frozenset({"description", "assignee_id", "due_date"})
 
-    title: str | None = Field(default=None, min_length=1, max_length=TASK_TITLE_MAX_LENGTH)
+    title: str | None = Field(
+        default=None, min_length=TASK_TITLE_MIN_LENGTH, max_length=TASK_TITLE_MAX_LENGTH
+    )
     description: str | None = None
     status: TaskStatus | None = None
     priority: TaskPriority | None = None
-    assignee_id: int | None = None
+    assignee_id: PositiveInt | None = None
     due_date: datetime | None = None
+
+    @field_validator("due_date")
+    @classmethod
+    def due_date_must_be_in_future(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value <= datetime.now(UTC):
+            raise ValueError("due_date must be in the future")
+        return value
 
 
 class TaskRead(BaseSchema):

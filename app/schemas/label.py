@@ -8,7 +8,7 @@ from app.core.constants import (
     LABEL_NAME_MAX_LENGTH,
     LABEL_NAME_MIN_LENGTH,
 )
-from app.schemas.base import BasePatchSchema, BaseSchema
+from app.schemas.base import BasePatchSchema, BaseSchema, PageResponse
 
 
 class LabelCreate(BaseSchema):
@@ -46,3 +46,7 @@ class LabelRead(BaseSchema):
     project_id: int
     name: str
     color: str
+
+
+class LabelPageResponse(PageResponse[LabelRead]):
+    pass
