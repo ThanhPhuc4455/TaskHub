@@ -1,0 +1,8 @@
+NOT_FOUND_MESSAGE = "{resource} {resource_id} not found"
+EMAIL_TAKEN_MESSAGE = "Email already registered"
+INVALID_CREDENTIALS_MESSAGE = "Incorrect email or password"
+INACTIVE_USER_MESSAGE = "Inactive user"
+INVALID_TOKEN_MESSAGE = "Invalid or expired token"
+WRONG_TOKEN_TYPE_MESSAGE = "Invalid token type"
+WRONG_PASSWORD_MESSAGE = "Current password is incorrect"
+FORBIDDEN_MESSAGE = "You do not have permission to perform this action"

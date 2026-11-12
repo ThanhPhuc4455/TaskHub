@@ -1,10 +1,10 @@
-from app.core.constants import (
+from app.core.exceptions import AuthenticationError, ConflictError
+from app.core.messages import (
     EMAIL_TAKEN_MESSAGE,
     INACTIVE_USER_MESSAGE,
     INVALID_CREDENTIALS_MESSAGE,
     INVALID_TOKEN_MESSAGE,
 )
-from app.core.exceptions import AuthenticationError, ConflictError
 from app.core.security import (
     REFRESH,
     create_access_token,

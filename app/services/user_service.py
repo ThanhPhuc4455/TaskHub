@@ -1,5 +1,5 @@
-from app.core.constants import WRONG_PASSWORD_MESSAGE
 from app.core.exceptions import BadRequestError
+from app.core.messages import WRONG_PASSWORD_MESSAGE
 from app.core.security import hash_password, verify_password
 from app.models.user import User
 from app.repositories.user_repository import UserRepository

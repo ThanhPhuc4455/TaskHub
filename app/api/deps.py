@@ -5,14 +5,13 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.constants import INVALID_TOKEN_MESSAGE
 from app.core.database import get_db_session
-from app.core.exceptions import AuthenticationError
 from app.core.security import ACCESS, decode_token
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.repositories.workspace_repository import WorkspaceRepository
 from app.services.auth_service import AuthService
+from app.services.user_context import resolve_active_user
 from app.services.user_service import UserService
 from app.services.workspace_service import WorkspaceService
 
@@ -38,8 +37,11 @@ def get_user_repository(
     return UserRepository(session)
 
 
+UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
+
+
 def get_auth_service(
-    users: Annotated[UserRepository, Depends(get_user_repository)],
+    users: UserRepositoryDep,
 ) -> AuthService:
     return AuthService(users)
 
@@ -51,17 +53,14 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/lo
 
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
-    users: Annotated[UserRepository, Depends(get_user_repository)],
+    users: UserRepositoryDep,
 ) -> User:
     payload = decode_token(token, ACCESS)
-    user = await users.get(payload.user_id)
-    if user is None or not user.is_active:
-        raise AuthenticationError(INVALID_TOKEN_MESSAGE)
-    return user
+    return await resolve_active_user(payload.user_id, users)
 
 
 def get_user_service(
-    users: Annotated[UserRepository, Depends(get_user_repository)],
+    users: UserRepositoryDep,
 ) -> UserService:
     return UserService(users)
 
