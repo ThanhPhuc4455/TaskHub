@@ -4,7 +4,7 @@ from pydantic import ConfigDict, Field
 
 from app.core.constants import PROJECT_NAME_MAX_LENGTH, PROJECT_NAME_MIN_LENGTH
 from app.models.enums import ProjectStatus
-from app.schemas.base import BasePatchSchema, BaseSchema
+from app.schemas.base import BasePatchSchema, BaseSchema, PageResponse
 
 
 class ProjectCreate(BaseSchema):
@@ -32,3 +32,7 @@ class ProjectRead(BaseSchema):
     description: str | None
     status: ProjectStatus
     created_at: datetime
+
+
+class ProjectPageResponse(PageResponse[ProjectRead]):
+    pass

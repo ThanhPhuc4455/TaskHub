@@ -50,9 +50,9 @@ async def create_comment(
 async def list_comments(
     task: TaskViewer, service: CommentServiceDep, pagination: PaginationDep
 ) -> CommentPageResponse:
-    comments, total = await service.list_comments(task, pagination)
+    result = await service.list_comments(task, pagination)
     return CommentPageResponse(
-        items=comments, total=total, page=pagination.page, limit=pagination.limit
+        items=result.items, total=result.total, page=pagination.page, limit=pagination.limit
     )
 
 

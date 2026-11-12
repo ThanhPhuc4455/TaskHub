@@ -1,7 +1,7 @@
 from typing import Protocol
 
 from app.core.constants import COMMENT_NOT_OWNER_MESSAGE, PROJECT_ARCHIVED_MESSAGE
-from app.core.exceptions import BadRequestError, ForbiddenError
+from app.core.exceptions import ConflictError, ForbiddenError
 from app.models.enums import ProjectStatus, WorkspaceMemberRole
 from app.models.project import Project
 from app.models.user import User
@@ -19,7 +19,7 @@ class TaskAccess(Protocol):
 
 def ensure_project_active(project: Project) -> None:
     if project.status == ProjectStatus.ARCHIVED:
-        raise BadRequestError(PROJECT_ARCHIVED_MESSAGE)
+        raise ConflictError(PROJECT_ARCHIVED_MESSAGE)
 
 
 def ensure_comment_deletion_allowed(access: TaskAccess, user: User, author_id: int) -> None:

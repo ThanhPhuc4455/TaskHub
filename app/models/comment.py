@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 class Comment(Base):
     __tablename__ = "comments"
+    __table_args__ = (Index("ix_comments_task_created", "task_id", "created_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
@@ -38,7 +39,4 @@ class Comment(Base):
 
     task: Mapped["Task"] = relationship(back_populates="comments")
 
-    author: Mapped["User"] = relationship(
-        foreign_keys=[author_id],
-        lazy="selectin",
-    )
+    author: Mapped["User"] = relationship(foreign_keys=[author_id])

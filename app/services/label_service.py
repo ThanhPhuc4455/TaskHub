@@ -47,9 +47,7 @@ class LabelService:
     async def list_labels(
         self, access: ProjectAccessContext, pagination: Pagination
     ) -> PageResult[Label]:
-        return await self._labels.list_by_project(
-            access.project.id, offset=pagination.offset, limit=pagination.limit
-        )
+        return await self._labels.list_by_project(access.project.id, pagination)
 
     async def update(self, access: LabelAccessContext, payload: LabelUpdate) -> Label:
         ensure_project_active(access.project)

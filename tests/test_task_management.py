@@ -27,11 +27,18 @@ async def test_task_crud_filters_and_pagination(client: AsyncClient) -> None:
     )
     second = await client.post(
         f"/api/v1/projects/{project_id}/tasks",
-        json={"title": "Second", "status": "DONE"},
+        json={"title": "Second"},
         headers=owner,
     )
     assert first.status_code == 201
     assert second.status_code == 201
+    rejected_client_status = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "Client status must be server-owned", "status": "DONE"},
+        headers=owner,
+    )
+    assert rejected_client_status.status_code == 422
+    assert second.json()["status"] == "TODO"
     assert first.json()["labels"] == []
     task_id = first.json()["id"]
 
@@ -89,7 +96,7 @@ async def test_task_rbac_assignee_and_archived_project(client: AsyncClient) -> N
         json={"title": "Blocked"},
         headers=owner,
     )
-    assert blocked.status_code == 400
+    assert blocked.status_code == 409
 
 
 async def test_labels_and_comments_enforce_project_and_comment_rules(

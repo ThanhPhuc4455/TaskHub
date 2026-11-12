@@ -45,4 +45,4 @@ async def test_workspace_list_supports_pagination(auth_client: AsyncClient) -> N
 
     response = await auth_client.get(f"{BASE}?page=2&limit=1")
     assert response.status_code == 200
-    assert [workspace["name"] for workspace in response.json()] == ["Team B"]
+    assert [workspace["name"] for workspace in response.json()["items"]] == ["Team B"]

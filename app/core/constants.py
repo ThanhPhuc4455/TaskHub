@@ -1,3 +1,5 @@
+from app.core.messages import *  # noqa: F403, E402
+
 WORKSPACE_NAME_MIN_LENGTH = 1
 WORKSPACE_NAME_MAX_LENGTH = 100
 PROJECT_NAME_MAX_LENGTH = 150
@@ -23,24 +25,3 @@ PASSWORD_MAX_BYTES = 72
 PASSWORD_HASH_MAX_LENGTH = 255
 JTI_MAX_LENGTH = 32
 REFRESH_TOKEN_CLEANUP_INTERVAL_SECONDS = 3600
-
-NOT_FOUND_MESSAGE = "{resource} {resource_id} not found"
-
-EMAIL_TAKEN_MESSAGE = "Email already registered"
-INVALID_CREDENTIALS_MESSAGE = "Incorrect email or password"
-INACTIVE_USER_MESSAGE = "Inactive user"
-INVALID_TOKEN_MESSAGE = "Invalid or expired token"
-WRONG_TOKEN_TYPE_MESSAGE = "Invalid token type"
-WRONG_PASSWORD_MESSAGE = "Current password is incorrect"
-FORBIDDEN_MESSAGE = "You do not have permission to perform this action"
-ALREADY_MEMBER_MESSAGE = "User is already a member of this workspace"
-CANNOT_REMOVE_OWNER_MESSAGE = "The workspace owner cannot be removed"
-CANNOT_CHANGE_OWNER_ROLE_MESSAGE = "The workspace owner's role cannot be changed"
-PROJECT_ARCHIVED_MESSAGE = "Archived projects cannot be modified"
-ASSIGNEE_NOT_MEMBER_MESSAGE = "Task assignee must be a workspace member"
-LABEL_PROJECT_MISMATCH_MESSAGE = "Label and task must belong to the same project"
-LABEL_ALREADY_ATTACHED_MESSAGE = "Label is already attached to this task"
-LABEL_NOT_ATTACHED_MESSAGE = "Label is not attached to this task"
-COMMENT_NOT_OWNER_MESSAGE = "You can only delete your own comments"
-LABEL_ALREADY_EXISTS_MESSAGE = "Label name already exists in this project"
-INVALID_COLOR_MESSAGE = "Color must be a 6-digit hexadecimal value"

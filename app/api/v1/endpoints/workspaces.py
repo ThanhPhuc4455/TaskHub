@@ -3,7 +3,12 @@ from fastapi import APIRouter, status
 from app.api.deps import CurrentUser, PaginationDep, WorkspaceServiceDep
 from app.api.responses import RBAC_RESPONSES
 from app.models.workspace import Workspace
-from app.schemas.workspace import WorkspaceCreate, WorkspaceRead, WorkspaceUpdate
+from app.schemas.workspace import (
+    WorkspaceCreate,
+    WorkspacePageResponse,
+    WorkspaceRead,
+    WorkspaceUpdate,
+)
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"], responses=RBAC_RESPONSES)
 
@@ -15,11 +20,14 @@ async def create_workspace(
     return await service.create(payload, owner_id=current_user.id)
 
 
-@router.get("", response_model=list[WorkspaceRead])
+@router.get("", response_model=WorkspacePageResponse)
 async def list_workspaces(
     service: WorkspaceServiceDep, current_user: CurrentUser, pagination: PaginationDep
-) -> list[Workspace]:
-    return await service.list_for_user(current_user, pagination)
+) -> WorkspacePageResponse:
+    result = await service.list_for_user(current_user, pagination)
+    return WorkspacePageResponse(
+        items=result.items, total=result.total, page=pagination.page, limit=pagination.limit
+    )
 
 
 @router.get("/{workspace_id}", response_model=WorkspaceRead)

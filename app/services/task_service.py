@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from app.core.constants import ASSIGNEE_NOT_MEMBER_MESSAGE
 from app.core.exceptions import BadRequestError
 from app.core.pagination import Pagination
+from app.models.enums import TaskStatus
 from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
@@ -53,7 +54,7 @@ class TaskService:
             assignee_id=payload.assignee_id,
             title=payload.title,
             description=payload.description,
-            status=payload.status,
+            status=TaskStatus.TODO,
             priority=payload.priority,
             due_date=payload.due_date,
             created_by=user.id,

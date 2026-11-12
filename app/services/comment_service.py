@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.core.pagination import Pagination
+from app.core.pagination import PageResult, Pagination
 from app.models.comment import Comment
 from app.models.user import User
 from app.repositories.comment_repository import CommentRepository
@@ -30,10 +30,8 @@ class CommentService:
 
     async def list_comments(
         self, task: TaskAccessContext, pagination: Pagination
-    ) -> tuple[list[Comment], int]:
-        return await self._comments.list_by_task(
-            task.task.id, offset=pagination.offset, limit=pagination.limit
-        )
+    ) -> PageResult[Comment]:
+        return await self._comments.list_by_task(task.task.id, pagination)
 
     async def delete(self, access: CommentAccessContext, user: User) -> None:
         ensure_project_active(access.task.project)

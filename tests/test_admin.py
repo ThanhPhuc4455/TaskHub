@@ -30,4 +30,4 @@ async def test_admin_can_list_every_workspace(client: AsyncClient) -> None:
 
     response = await client.get("/api/v1/admin/workspaces", headers=admin)
     assert response.status_code == 200
-    assert [workspace["name"] for workspace in response.json()] == ["Team A"]
+    assert [workspace["name"] for workspace in response.json()["items"]] == ["Team A"]

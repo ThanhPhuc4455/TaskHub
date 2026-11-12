@@ -10,9 +10,9 @@ from app.schemas.user import UserSummary
 
 
 class TaskCreate(BaseSchema):
+    model_config = ConfigDict(extra="forbid")
     title: str = Field(min_length=TASK_TITLE_MIN_LENGTH, max_length=TASK_TITLE_MAX_LENGTH)
     description: str | None = None
-    status: TaskStatus = TaskStatus.TODO
     priority: TaskPriority = TaskPriority.MEDIUM
     assignee_id: PositiveInt | None = None
     due_date: datetime | None = None

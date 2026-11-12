@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from app.core.exceptions import NotFoundError
-from app.core.pagination import Pagination
+from app.core.pagination import PageResult, Pagination
 from app.models.enums import ProjectStatus, WorkspaceMemberRole
 from app.models.project import Project
 from app.models.user import User
@@ -31,10 +31,8 @@ class ProjectService:
 
     async def list_for_workspace(
         self, access: WorkspaceAccessContext, pagination: Pagination
-    ) -> list[Project]:
-        return await self._projects.list_by_workspace(
-            access.workspace_id, offset=pagination.offset, limit=pagination.limit
-        )
+    ) -> PageResult[Project]:
+        return await self._projects.list_by_workspace(access.workspace_id, pagination)
 
     async def require_project_role(
         self, project_id: int, user: User, required: WorkspaceMemberRole
@@ -55,6 +53,9 @@ class ProjectService:
 
     async def archive(self, access: ProjectAccessContext) -> Project:
         return await self._projects.update(access.project, {"status": ProjectStatus.ARCHIVED})
+
+    async def unarchive(self, access: ProjectAccessContext) -> Project:
+        return await self._projects.update(access.project, {"status": ProjectStatus.ACTIVE})
 
     async def delete(self, access: ProjectAccessContext) -> None:
         await self._projects.delete(access.project)

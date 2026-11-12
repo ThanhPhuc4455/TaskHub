@@ -11,7 +11,7 @@ from app.api.deps import (
 from app.api.responses import RBAC_RESPONSES
 from app.models.enums import WorkspaceMemberRole
 from app.models.project import Project
-from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
+from app.schemas.project import ProjectCreate, ProjectPageResponse, ProjectRead, ProjectUpdate
 from app.services.project_service import ProjectAccessContext
 from app.services.workspace_service import WorkspaceAccessContext
 
@@ -55,15 +55,18 @@ async def create_project(
 
 @router.get(
     "/workspaces/{workspace_id}/projects",
-    response_model=list[ProjectRead],
+    response_model=ProjectPageResponse,
     summary="List workspace projects",
 )
 async def list_projects(
     access: WorkspaceViewer,
     service: ProjectServiceDep,
     pagination: PaginationDep,
-) -> list[Project]:
-    return await service.list_for_workspace(access, pagination)
+) -> ProjectPageResponse:
+    result = await service.list_for_workspace(access, pagination)
+    return ProjectPageResponse(
+        items=result.items, total=result.total, page=pagination.page, limit=pagination.limit
+    )
 
 
 @router.get("/projects/{project_id}", response_model=ProjectRead, summary="Get a project")
@@ -87,6 +90,15 @@ async def update_project(
 )
 async def archive_project(access: ProjectOwner, service: ProjectServiceDep) -> Project:
     return await service.archive(access)
+
+
+@router.post(
+    "/projects/{project_id}/unarchive",
+    response_model=ProjectRead,
+    summary="Unarchive a project",
+)
+async def unarchive_project(access: ProjectOwner, service: ProjectServiceDep) -> Project:
+    return await service.unarchive(access)
 
 
 @router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)

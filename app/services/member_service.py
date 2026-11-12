@@ -1,10 +1,12 @@
+from sqlalchemy.exc import IntegrityError
+
 from app.core.constants import (
     ALREADY_MEMBER_MESSAGE,
     CANNOT_CHANGE_OWNER_ROLE_MESSAGE,
     CANNOT_REMOVE_OWNER_MESSAGE,
 )
 from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
-from app.core.pagination import Pagination
+from app.core.pagination import PageResult, Pagination
 from app.models.user import User
 from app.models.workspace_member import WorkspaceMember, WorkspaceMemberRole
 from app.repositories.user_repository import UserRepository
@@ -26,11 +28,9 @@ class MemberService:
 
     async def list_members(
         self, workspace_id: int, user: User, pagination: Pagination
-    ) -> list[WorkspaceMember]:
+    ) -> PageResult[WorkspaceMember]:
         await self._workspaces.require_role(workspace_id, user, WorkspaceMemberRole.VIEWER)
-        return await self._members.list_by_workspace(
-            workspace_id, offset=pagination.offset, limit=pagination.limit
-        )
+        return await self._members.list_by_workspace(workspace_id, pagination)
 
     async def invite(
         self, workspace_id: int, user: User, payload: InviteMemberRequest
@@ -41,9 +41,13 @@ class MemberService:
             raise NotFoundError("User", payload.email)
         if await self._members.get_membership(workspace_id, invitee.id) is not None:
             raise ConflictError(ALREADY_MEMBER_MESSAGE)
-        return await self._members.create(
-            workspace_id=workspace_id, user_id=invitee.id, role=payload.role
-        )
+        try:
+            return await self._members.create(
+                workspace_id=workspace_id, user_id=invitee.id, role=payload.role
+            )
+        except IntegrityError as exc:
+            await self._members.rollback()
+            raise ConflictError(ALREADY_MEMBER_MESSAGE) from exc
 
     async def remove(self, workspace_id: int, user: User, target_user_id: int) -> None:
         workspace = await self._workspaces.require_role(

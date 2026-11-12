@@ -89,7 +89,7 @@ async def test_owner_can_archive_project(client: AsyncClient) -> None:
         json={"name": "No longer editable"},
         headers=owner,
     )
-    assert update.status_code == 400
+    assert update.status_code == 409
 
     deleted = await client.delete(f"/api/v1/projects/{project_id}", headers=owner)
     assert deleted.status_code == 204
@@ -126,7 +126,7 @@ async def test_project_list_supports_pagination(client: AsyncClient) -> None:
         headers=owner,
     )
     assert response.status_code == 200
-    assert [project["name"] for project in response.json()] == ["Project B"]
+    assert [project["name"] for project in response.json()["items"]] == ["Project B"]
 
 
 async def test_project_idor_is_hidden_from_other_workspace(client: AsyncClient) -> None:

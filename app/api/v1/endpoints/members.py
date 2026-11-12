@@ -3,7 +3,12 @@ from fastapi import APIRouter, status
 from app.api.deps import CurrentUser, MemberServiceDep, PaginationDep
 from app.api.responses import RBAC_RESPONSES
 from app.models.workspace_member import WorkspaceMember
-from app.schemas.member import InviteMemberRequest, MemberRead, UpdateMemberRoleRequest
+from app.schemas.member import (
+    InviteMemberRequest,
+    MemberPageResponse,
+    MemberRead,
+    UpdateMemberRoleRequest,
+)
 
 router = APIRouter(
     prefix="/workspaces/{workspace_id}/members",
@@ -12,14 +17,17 @@ router = APIRouter(
 )
 
 
-@router.get("", response_model=list[MemberRead])
+@router.get("", response_model=MemberPageResponse)
 async def list_members(
     workspace_id: int,
     service: MemberServiceDep,
     current_user: CurrentUser,
     pagination: PaginationDep,
-) -> list[WorkspaceMember]:
-    return await service.list_members(workspace_id, current_user, pagination)
+) -> MemberPageResponse:
+    result = await service.list_members(workspace_id, current_user, pagination)
+    return MemberPageResponse(
+        items=result.items, total=result.total, page=pagination.page, limit=pagination.limit
+    )
 
 
 @router.post("", response_model=MemberRead, status_code=status.HTTP_201_CREATED)

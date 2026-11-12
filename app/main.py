@@ -11,13 +11,7 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.constants import REFRESH_TOKEN_CLEANUP_INTERVAL_SECONDS
 from app.core.database import AsyncSessionLocal, engine
-from app.core.exceptions import (
-    AuthenticationError,
-    BadRequestError,
-    ConflictError,
-    ForbiddenError,
-    NotFoundError,
-)
+from app.core.exceptions import AppException
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 
 logger = logging.getLogger(__name__)
@@ -52,33 +46,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
 
 
-@app.exception_handler(NotFoundError)
-async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:
-    return JSONResponse(status_code=404, content={"detail": str(exc)})
-
-
-@app.exception_handler(ConflictError)
-async def conflict_handler(request: Request, exc: ConflictError) -> JSONResponse:
-    return JSONResponse(status_code=409, content={"detail": str(exc)})
-
-
-@app.exception_handler(AuthenticationError)
-async def authentication_handler(request: Request, exc: AuthenticationError) -> JSONResponse:
-    return JSONResponse(
-        status_code=401,
-        content={"detail": str(exc)},
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-
-@app.exception_handler(BadRequestError)
-async def bad_request_handler(request: Request, exc: BadRequestError) -> JSONResponse:
-    return JSONResponse(status_code=400, content={"detail": str(exc)})
-
-
-@app.exception_handler(ForbiddenError)
-async def forbidden_handler(request: Request, exc: ForbiddenError) -> JSONResponse:
-    return JSONResponse(status_code=403, content={"detail": str(exc)})
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+    headers = {"WWW-Authenticate": "Bearer"} if exc.status_code == 401 else None
+    return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)}, headers=headers)
 
 
 @app.get("/health", tags=["system"])
