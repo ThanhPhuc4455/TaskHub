@@ -1,20 +1,23 @@
-import enum
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, Enum, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.constants import (
+    EMAIL_MAX_LENGTH,
+    ENUM_MAX_LENGTH,
+    FULL_NAME_MAX_LENGTH,
+    PASSWORD_HASH_MAX_LENGTH,
+)
 from app.models.base import Base
+from app.models.enums import UserRole
+
+__all__ = ["User", "UserRole"]
 
 if TYPE_CHECKING:
     from app.models.workspace import Workspace
     from app.models.workspace_member import WorkspaceMember
-
-
-class UserRole(enum.StrEnum):
-    ADMIN = "ADMIN"
-    MEMBER = "MEMBER"
 
 
 class User(Base):
@@ -26,19 +29,19 @@ class User(Base):
     )
 
     email: Mapped[str] = mapped_column(
-        String(255),
+        String(EMAIL_MAX_LENGTH),
         unique=True,
         index=True,
         nullable=False,
     )
 
     full_name: Mapped[str] = mapped_column(
-        String(150),
+        String(FULL_NAME_MAX_LENGTH),
         nullable=False,
     )
 
     hashed_password: Mapped[str] = mapped_column(
-        String(255),
+        String(PASSWORD_HASH_MAX_LENGTH),
         nullable=False,
     )
 
@@ -47,7 +50,8 @@ class User(Base):
             UserRole,
             name="user_role",
             native_enum=False,
-            length=20,
+            length=ENUM_MAX_LENGTH,
+            create_constraint=True,
         ),
         default=UserRole.MEMBER,
         nullable=False,
@@ -66,6 +70,7 @@ class User(Base):
 
     owned_workspaces: Mapped[list["Workspace"]] = relationship(
         back_populates="owner",
+        passive_deletes=True,
     )
 
     workspace_memberships: Mapped[list["WorkspaceMember"]] = relationship(

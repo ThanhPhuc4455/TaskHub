@@ -8,6 +8,7 @@ from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.task import Task
+    from app.models.user import User
 
 
 class Comment(Base):
@@ -22,7 +23,8 @@ class Comment(Base):
     )
 
     author_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        index=True,
         nullable=False,
     )
 
@@ -35,3 +37,8 @@ class Comment(Base):
     )
 
     task: Mapped["Task"] = relationship(back_populates="comments")
+
+    author: Mapped["User"] = relationship(
+        foreign_keys=[author_id],
+        lazy="selectin",
+    )
