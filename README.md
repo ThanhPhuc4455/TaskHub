@@ -60,6 +60,23 @@ An ADMIN can verify access through `GET /api/v1/admin/workspaces`.
 - Members: `/api/v1/workspaces/{workspace_id}/members`
 - Projects: `/api/v1/workspaces/{workspace_id}/projects` and `/api/v1/projects/{project_id}`
 - ADMIN: `/api/v1/admin/workspaces`
+- Tasks: `/api/v1/projects/{project_id}/tasks` and `/api/v1/tasks/{task_id}`
+- Labels: `/api/v1/projects/{project_id}/labels` and `/api/v1/labels/{label_id}`
+- Comments: `/api/v1/tasks/{task_id}/comments`
+
+## Day 5 task management
+
+Tasks, labels, and comments resolve their owning project and workspace before
+authorization. VIEWER can read; EDITOR can create/update/delete tasks and labels
+and add comments; comment deletion is limited to the author, workspace OWNER, or
+ADMIN. Archived projects are read-only. A task assignee must already be a member
+of the workspace, labels cannot cross projects, and duplicate task-label links
+return `409`.
+
+Task listing supports `status`, `priority`, `assignee_id`, `page`, and `limit`.
+It returns `items`, `total`, `page`, and `limit`, ordered by `created_at DESC,
+id DESC`. Invalid input returns `422`; missing resources are `404` and
+insufficient role is `403`.
 
 List endpoints accept `page` and `limit` query parameters. `page` starts at 1 and
 `limit` is between 1 and 100.

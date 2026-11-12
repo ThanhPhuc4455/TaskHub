@@ -8,19 +8,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.constants import FORBIDDEN_MESSAGE, INVALID_TOKEN_MESSAGE
 from app.core.database import get_db_session
-from app.core.exceptions import AuthenticationError, ForbiddenError
+from app.core.exceptions import AuthenticationError, ForbiddenError, NotFoundError
 from app.core.pagination import Pagination
 from app.core.security import ACCESS, decode_token
 from app.models.enums import WorkspaceMemberRole
 from app.models.user import User, UserRole
+from app.repositories.comment_repository import CommentRepository
+from app.repositories.label_repository import LabelRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
+from app.repositories.task_repository import TaskRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.workspace_member_repository import WorkspaceMemberRepository
 from app.repositories.workspace_repository import WorkspaceRepository
 from app.services.auth_service import AuthService
+from app.services.comment_service import CommentAccessContext, CommentService
+from app.services.label_service import LabelAccessContext, LabelService
 from app.services.member_service import MemberService
 from app.services.project_service import ProjectAccessContext, ProjectService
+from app.services.task_service import TaskAccessContext, TaskService
 from app.services.user_service import UserService
 from app.services.workspace_service import (
     WorkspaceAccessContext,
@@ -75,6 +81,50 @@ def get_project_service(
 
 
 ProjectServiceDep = Annotated[ProjectService, Depends(get_project_service)]
+
+
+def get_task_repository(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> TaskRepository:
+    return TaskRepository(session)
+
+
+def get_label_repository(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> LabelRepository:
+    return LabelRepository(session)
+
+
+def get_comment_repository(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> CommentRepository:
+    return CommentRepository(session)
+
+
+def get_task_service(
+    tasks: Annotated[TaskRepository, Depends(get_task_repository)],
+    projects: Annotated[ProjectRepository, Depends(get_project_repository)],
+    members: Annotated[WorkspaceMemberRepository, Depends(get_workspace_member_repository)],
+) -> TaskService:
+    return TaskService(tasks, projects, members)
+
+
+def get_label_service(
+    labels: Annotated[LabelRepository, Depends(get_label_repository)],
+    tasks: Annotated[TaskRepository, Depends(get_task_repository)],
+) -> LabelService:
+    return LabelService(labels, tasks)
+
+
+def get_comment_service(
+    comments: Annotated[CommentRepository, Depends(get_comment_repository)],
+) -> CommentService:
+    return CommentService(comments)
+
+
+TaskServiceDep = Annotated[TaskService, Depends(get_task_service)]
+LabelServiceDep = Annotated[LabelService, Depends(get_label_service)]
+CommentServiceDep = Annotated[CommentService, Depends(get_comment_service)]
 
 
 def get_user_repository(
@@ -173,5 +223,93 @@ def require_project_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
         )
         assert project is not None
         return ProjectAccessContext(project=project, workspace=workspace)
+
+    return dependency
+
+
+def require_task_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
+    async def dependency(
+        task_id: int,
+        tasks: Annotated[TaskRepository, Depends(get_task_repository)],
+        projects: Annotated[ProjectRepository, Depends(get_project_repository)],
+        workspaces: WorkspaceServiceDep,
+        current_user: CurrentUser,
+    ) -> TaskAccessContext:
+        task = await tasks.get_with_details(task_id)
+        if task is None:
+            raise NotFoundError("Task", task_id)
+        project = await projects.get(task.project_id)
+        project, workspace = await authorize_resource(
+            project,
+            "Project",
+            project.workspace_id if project is not None else task.project_id,
+            current_user,
+            required,
+            workspaces,
+        )
+        assert project is not None
+        return TaskAccessContext(task=task, project=project, workspace=workspace)
+
+    return dependency
+
+
+def require_label_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
+    async def dependency(
+        label_id: int,
+        labels: Annotated[LabelRepository, Depends(get_label_repository)],
+        projects: Annotated[ProjectRepository, Depends(get_project_repository)],
+        workspaces: WorkspaceServiceDep,
+        current_user: CurrentUser,
+    ) -> LabelAccessContext:
+        label = await labels.get(label_id)
+        if label is None:
+            raise NotFoundError("Label", label_id)
+        project = await projects.get(label.project_id)
+        project, workspace = await authorize_resource(
+            project,
+            "Project",
+            project.workspace_id if project is not None else label.project_id,
+            current_user,
+            required,
+            workspaces,
+        )
+        assert project is not None
+        return LabelAccessContext(label=label, project=project, workspace=workspace)
+
+    return dependency
+
+
+def require_comment_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
+    async def dependency(
+        task_id: int,
+        comment_id: int,
+        comments: Annotated[CommentRepository, Depends(get_comment_repository)],
+        tasks: Annotated[TaskRepository, Depends(get_task_repository)],
+        projects: Annotated[ProjectRepository, Depends(get_project_repository)],
+        workspaces: WorkspaceServiceDep,
+        current_user: CurrentUser,
+    ) -> CommentAccessContext:
+        comment = await comments.get_with_author(comment_id)
+        if comment is None:
+            raise NotFoundError("Comment", comment_id)
+        if comment.task_id != task_id:
+            raise NotFoundError("Comment", comment_id)
+        task = await tasks.get_with_details(comment.task_id)
+        if task is None:
+            raise NotFoundError("Task", comment.task_id)
+        project = await projects.get(task.project_id)
+        project, workspace = await authorize_resource(
+            project,
+            "Project",
+            project.workspace_id if project is not None else task.project_id,
+            current_user,
+            required,
+            workspaces,
+        )
+        assert project is not None
+        return CommentAccessContext(
+            comment=comment,
+            task=TaskAccessContext(task=task, project=project, workspace=workspace),
+        )
 
     return dependency

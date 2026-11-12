@@ -14,6 +14,9 @@ class BaseRepository[ModelT: Base]:
     async def commit(self) -> None:
         await self.session.commit()
 
+    async def rollback(self) -> None:
+        await self.session.rollback()
+
     async def _flush_or_commit(self, commit: bool) -> None:
         if commit:
             await self.session.commit()

@@ -20,3 +20,10 @@ class BasePatchSchema(BaseSchema):
             if field not in self.nullable_fields and getattr(self, field) is None:
                 raise ValueError(f"{field} must not be null")
         return self
+
+
+class PageResponse[ItemT](BaseModel):
+    items: list[ItemT]
+    total: int
+    page: int
+    limit: int

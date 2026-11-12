@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from app.models.comment import Comment
     from app.models.label import Label
     from app.models.project import Project
+    from app.models.user import User
 
 
 class Task(Base):
@@ -79,11 +80,29 @@ class Task(Base):
         nullable=False,
     )
 
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
     project: Mapped["Project"] = relationship(back_populates="tasks")
+
+    assignee: Mapped["User | None"] = relationship(
+        foreign_keys=[assignee_id],
+        lazy="selectin",
+    )
+
+    creator: Mapped["User"] = relationship(
+        foreign_keys=[created_by],
+        lazy="selectin",
+    )
 
     labels: Mapped[list["Label"]] = relationship(
         secondary="task_labels",
         back_populates="tasks",
+        lazy="selectin",
     )
 
     comments: Mapped[list["Comment"]] = relationship(
