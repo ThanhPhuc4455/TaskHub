@@ -19,7 +19,7 @@ from app.models.user import User
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import RegisterRequest, TokenResponse
-from app.services.user_context import resolve_active_user
+from app.services.user_context import resolve_user
 
 
 class AuthService:
@@ -58,7 +58,7 @@ class AuthService:
         if not await self._tokens.claim_for_rotation(payload.jti, commit=False):
             await self._tokens.revoke_all_for_user(payload.user_id)
             raise AuthenticationError(INVALID_TOKEN_MESSAGE)
-        user = await resolve_active_user(payload.user_id, self._users)
+        user = await resolve_user(payload.user_id, self._users)
         tokens = await self._issue_tokens(user.id, commit=False)
         await self._tokens.commit()
         return tokens

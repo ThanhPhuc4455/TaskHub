@@ -1,4 +1,8 @@
 from httpx import AsyncClient
+from sqlalchemy import select
+
+from app.main import app as fastapi_app
+from app.models.user import User
 
 ME = "/api/v1/users/me"
 
@@ -65,3 +69,27 @@ async def test_change_password_revokes_refresh_tokens(auth_client: AsyncClient) 
     assert (
         await auth_client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
     ).status_code == 401
+
+
+async def test_inactive_user_cannot_refresh_or_read_profile(auth_client: AsyncClient) -> None:
+    tokens = await auth_client.post(
+        "/api/v1/auth/login",
+        data={"username": "owner@example.com", "password": "password123"},
+    )
+    assert tokens.status_code == 200
+    refresh_token = tokens.json()["refresh_token"]
+
+    sessionmaker = fastapi_app.state.test_sessionmaker
+    async with sessionmaker() as session:
+        user = await session.scalar(select(User).where(User.email == "owner@example.com"))
+        assert user is not None
+        user.is_active = False
+        await session.commit()
+
+    refresh = await auth_client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    assert refresh.status_code == 401
+    assert refresh.json()["detail"] == "Inactive user"
+
+    profile = await auth_client.get(ME)
+    assert profile.status_code == 401
+    assert profile.json()["detail"] == "Inactive user"

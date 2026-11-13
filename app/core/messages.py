@@ -1,5 +1,4 @@
 NOT_FOUND_MESSAGE = "{resource} {resource_id} not found"
-
 EMAIL_TAKEN_MESSAGE = "Email already registered"
 INVALID_CREDENTIALS_MESSAGE = "Incorrect email or password"
 INACTIVE_USER_MESSAGE = "Inactive user"
@@ -20,3 +19,5 @@ LABEL_NOT_ATTACHED_MESSAGE = "Label is not attached to this task"
 COMMENT_NOT_OWNER_MESSAGE = "You can only delete your own comments"
 LABEL_ALREADY_EXISTS_MESSAGE = "Label name already exists in this project"
 INVALID_COLOR_MESSAGE = "Color must be a 6-digit hexadecimal value"
+PASSWORD_TOO_LONG_MESSAGE = "password must be at most {max_bytes} bytes"
+FIELD_MUST_NOT_BE_NULL_MESSAGE = "{field} must not be null"

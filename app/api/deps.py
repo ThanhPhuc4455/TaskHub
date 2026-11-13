@@ -12,7 +12,7 @@ from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.workspace_repository import WorkspaceRepository
 from app.services.auth_service import AuthService
-from app.services.user_context import resolve_active_user
+from app.services.user_context import resolve_user
 from app.services.user_service import UserService
 from app.services.workspace_service import WorkspaceService
 
@@ -65,7 +65,7 @@ async def get_current_user(
     users: UserRepositoryDep,
 ) -> User:
     payload = decode_token(token, TokenType.ACCESS)
-    return await resolve_active_user(payload.user_id, users)
+    return await resolve_user(payload.user_id, users)
 
 
 def get_user_service(
