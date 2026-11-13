@@ -3,7 +3,6 @@ from app.core.messages import (
     EMAIL_TAKEN_MESSAGE,
     INACTIVE_USER_MESSAGE,
     INVALID_CREDENTIALS_MESSAGE,
-    INVALID_TOKEN_MESSAGE,
 )
 from app.core.security import (
     REFRESH,
@@ -43,11 +42,7 @@ class AuthService:
 
     async def refresh(self, refresh_token: str) -> TokenResponse:
         payload = decode_token(refresh_token, REFRESH)
-        user = await resolve_user(
-            payload.user_id,
-            self._users,
-            inactive_message=INVALID_TOKEN_MESSAGE,
-        )
+        user = await resolve_user(payload.user_id, self._users)
         return self._issue_tokens(user.id)
 
     @staticmethod
