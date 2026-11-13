@@ -100,6 +100,9 @@ Redis failures are logged and transparently fall back to the database. Cache
 versions are incremented after successful commits for task create/update/delete,
 label create/update/delete and attach/detach, project archive/unarchive/delete,
 workspace cascade deletion, and profile changes for users who are task assignees.
+If Redis invalidation fails after the database commit succeeds, an older cache
+entry may remain visible for at most `CACHE_TTL_SECONDS` (120 seconds by
+default), after which it expires naturally.
 Member removal does not invalidate task lists because it does not change the
 assignee summary stored in a task response. No cache key contains caller data:
 the response is not user-specific after RBAC authorization.
@@ -126,4 +129,12 @@ return a generic 500 message while the full traceback remains server-side.
 
 The test suite uses an injectable fake cache and notification service. A real
 Redis integration test can be added separately when Redis is available; the
-normal suite does not require a running Redis instance.
+normal suite does not require a running Redis instance. Run the real Redis
+integration tests with:
+
+```powershell
+uv run pytest -q -m redis_integration
+```
+
+These tests use Redis database 1, skip only when Redis is unavailable, and clean
+only their own `project:integration:*` keys with SCAN/DEL.
