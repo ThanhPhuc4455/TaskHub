@@ -1,7 +1,8 @@
 from fastapi import APIRouter, status
 
-from app.api.deps import CurrentUser, PaginationDep, WorkspaceServiceDep
+from app.api.deps import CacheDep, CurrentUser, PaginationDep, WorkspaceServiceDep
 from app.api.responses import RBAC_RESPONSES
+from app.core.cache import invalidate_task_cache
 from app.models.workspace import Workspace
 from app.schemas.workspace import (
     WorkspaceCreate,
@@ -49,6 +50,12 @@ async def update_workspace(
 
 @router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_workspace(
-    workspace_id: int, service: WorkspaceServiceDep, current_user: CurrentUser
+    workspace_id: int,
+    service: WorkspaceServiceDep,
+    current_user: CurrentUser,
+    cache: CacheDep,
 ) -> None:
+    project_ids = await service.project_ids(workspace_id, current_user)
     await service.delete(workspace_id, current_user)
+    for project_id in project_ids:
+        await invalidate_task_cache(cache, project_id)

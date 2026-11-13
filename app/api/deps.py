@@ -1,10 +1,12 @@
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from typing import Annotated, Any
 
 from fastapi import Depends, Query
 from fastapi.security import OAuth2PasswordBearer
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import CacheBackend, RedisCacheBackend
 from app.core.config import settings
 from app.core.constants import (
     DEFAULT_PAGE_SIZE,
@@ -37,6 +39,18 @@ from app.services.workspace_service import (
     WorkspaceAccessContext,
     WorkspaceService,
 )
+
+
+async def get_cache_backend() -> AsyncIterator[CacheBackend]:
+    client = Redis.from_url(settings.redis_url, decode_responses=True)
+    backend = RedisCacheBackend(client)
+    try:
+        yield backend
+    finally:
+        await backend.close()
+
+
+CacheDep = Annotated[CacheBackend, Depends(get_cache_backend)]
 
 
 def get_workspace_repository(

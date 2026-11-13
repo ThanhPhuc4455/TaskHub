@@ -61,6 +61,12 @@ class TaskRepository(BaseRepository[Task]):
         result = await self.session.scalars(stmt)
         return TaskPage(items=list(result.all()), total=total or 0)
 
+    async def project_ids_by_assignee(self, user_id: int) -> list[int]:
+        result = await self.session.scalars(
+            select(Task.project_id).where(Task.assignee_id == user_id).distinct()
+        )
+        return list(result.all())
+
     async def attach_label(self, task_id: int, label_id: int, *, commit: bool = True) -> None:
         await self.session.execute(insert(task_labels).values(task_id=task_id, label_id=label_id))
         await self._flush_or_commit(commit)

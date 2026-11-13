@@ -100,3 +100,7 @@ class WorkspaceService:
     async def delete(self, workspace_id: int, user: User) -> None:
         workspace = await self.require_role(workspace_id, user, WorkspaceMemberRole.OWNER)
         await self._workspaces.delete(workspace)
+
+    async def project_ids(self, workspace_id: int, user: User) -> list[int]:
+        await self.require_role(workspace_id, user, WorkspaceMemberRole.OWNER)
+        return await self._workspaces.list_project_ids(workspace_id)

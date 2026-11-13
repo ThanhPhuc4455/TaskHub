@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
+    redis_url: str = "redis://127.0.0.1:6379/0"
+    cache_ttl_seconds: int = 120
 
     model_config = SettingsConfigDict(
         env_file=".env",
