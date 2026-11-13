@@ -1,9 +1,8 @@
 import asyncio
 import os
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime, timedelta
-from uuid import uuid4
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
@@ -17,7 +16,6 @@ from app.models.user import User
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
 from app.services.auth_service import AuthService
-
 
 REVIEW8_DATABASE_URL = os.getenv("REVIEW8_DATABASE_URL")
 
@@ -120,3 +118,27 @@ async def test_inactive_user_refresh_rolls_back_old_token_claim(
             select(RefreshToken.revoked).where(RefreshToken.user_id == user_id)
         )
         assert result is False
+
+
+@pytest.mark.asyncio
+async def test_refresh_token_reuse_revokes_all_user_tokens(
+    postgres_sessionmaker: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id, token = await create_user_and_refresh_token(postgres_sessionmaker)
+    async with postgres_sessionmaker() as session:
+        service = AuthService(UserRepository(session), RefreshTokenRepository(session))
+        await service.refresh(token)
+
+    async with postgres_sessionmaker() as session:
+        service = AuthService(UserRepository(session), RefreshTokenRepository(session))
+        with pytest.raises(AuthenticationError):
+            await service.refresh(token)
+
+    async with postgres_sessionmaker() as session:
+        tokens = list(
+            (
+                await session.scalars(select(RefreshToken).where(RefreshToken.user_id == user_id))
+            ).all()
+        )
+        assert tokens
+        assert all(token.revoked for token in tokens)
