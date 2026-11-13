@@ -3,6 +3,7 @@ import os
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -79,3 +80,43 @@ async def test_concurrent_refresh_has_one_winner(
         refresh_in_new_session(postgres_sessionmaker, token),
     )
     assert sorted(results) == [False, True]
+
+
+@pytest.mark.asyncio
+async def test_refresh_failure_rolls_back_old_token_claim(
+    postgres_sessionmaker: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id, token = await create_user_and_refresh_token(postgres_sessionmaker)
+    with patch.object(
+        AuthService,
+        "_issue_tokens",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("token creation failed"),
+    ):
+        async with postgres_sessionmaker() as session:
+            service = AuthService(UserRepository(session), RefreshTokenRepository(session))
+            with pytest.raises(RuntimeError, match="token creation failed"):
+                await service.refresh(token)
+
+    async with postgres_sessionmaker() as session:
+        result = await session.scalar(
+            select(RefreshToken.revoked).where(RefreshToken.user_id == user_id)
+        )
+        assert result is False
+
+
+@pytest.mark.asyncio
+async def test_inactive_user_refresh_rolls_back_old_token_claim(
+    postgres_sessionmaker: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id, token = await create_user_and_refresh_token(postgres_sessionmaker, is_active=False)
+    async with postgres_sessionmaker() as session:
+        service = AuthService(UserRepository(session), RefreshTokenRepository(session))
+        with pytest.raises(AuthenticationError, match="Inactive user"):
+            await service.refresh(token)
+
+    async with postgres_sessionmaker() as session:
+        result = await session.scalar(
+            select(RefreshToken.revoked).where(RefreshToken.user_id == user_id)
+        )
+        assert result is False
