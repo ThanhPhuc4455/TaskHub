@@ -1,11 +1,12 @@
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 
 from app.api.deps import (
     CacheDep,
     CurrentUser,
+    NotificationServiceDep,
     PaginationDep,
     TaskServiceDep,
     require_project_role,
@@ -17,6 +18,7 @@ from app.models.enums import TaskPriority, TaskStatus, WorkspaceMemberRole
 from app.models.task import Task
 from app.repositories.task_repository import TaskFilters
 from app.schemas.task import TaskCreate, TaskPageResponse, TaskRead, TaskUpdate
+from app.services.notification_service import notify_task_assigned_safely
 from app.services.project_service import ProjectAccessContext
 from app.services.task_service import TaskAccessContext
 
@@ -53,6 +55,8 @@ async def create_task(
     current_user: CurrentUser,
     service: TaskServiceDep,
     cache: CacheDep,
+    background_tasks: BackgroundTasks,
+    notification: NotificationServiceDep,
 ) -> Task:
     task = await service.create(access, current_user, payload)
     try:
@@ -61,6 +65,15 @@ async def create_task(
         await invalidate_task_cache(cache, access.project.id)
     except Exception:
         logger.warning("Task cache invalidation failed after task creation", exc_info=True)
+    if task.assignee is not None and task.assignee.id != current_user.id:
+        background_tasks.add_task(
+            notify_task_assigned_safely,
+            notification,
+            recipient_email=task.assignee.email,
+            task_title=task.title,
+            project_name=access.project.name,
+            assigner_name=current_user.full_name,
+        )
     return task
 
 
@@ -104,12 +117,33 @@ async def get_task(access: TaskViewer, service: TaskServiceDep) -> Task:
 
 @router.patch("/tasks/{task_id}", response_model=TaskRead)
 async def update_task(
-    payload: TaskUpdate, access: TaskEditor, service: TaskServiceDep, cache: CacheDep
+    payload: TaskUpdate,
+    access: TaskEditor,
+    service: TaskServiceDep,
+    cache: CacheDep,
+    current_user: CurrentUser,
+    background_tasks: BackgroundTasks,
+    notification: NotificationServiceDep,
 ) -> Task:
+    previous_assignee_id = access.task.assignee_id
     task = await service.update(access, payload)
     from app.core.cache import invalidate_task_cache
 
     await invalidate_task_cache(cache, access.project.id)
+    if (
+        "assignee_id" in payload.model_fields_set
+        and task.assignee is not None
+        and task.assignee.id != previous_assignee_id
+        and task.assignee.id != current_user.id
+    ):
+        background_tasks.add_task(
+            notify_task_assigned_safely,
+            notification,
+            recipient_email=task.assignee.email,
+            task_title=task.title,
+            project_name=access.project.name,
+            assigner_name=current_user.full_name,
+        )
     return task
 
 

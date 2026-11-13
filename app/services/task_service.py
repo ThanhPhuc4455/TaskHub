@@ -77,7 +77,8 @@ class TaskService:
         data = payload.model_dump(exclude_unset=True)
         if "assignee_id" in data:
             await self._check_assignee(access.workspace.workspace_id, data["assignee_id"])
-        return await self._tasks.update(access.task, data)
+        updated = await self._tasks.update(access.task, data)
+        return (await self._tasks.get_with_details(updated.id)) or updated
 
     async def delete(self, access: TaskAccessContext) -> None:
         ensure_project_active(access.project)
