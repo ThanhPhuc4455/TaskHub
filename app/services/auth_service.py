@@ -16,6 +16,7 @@ from app.core.security import (
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import RegisterRequest, TokenResponse
+from app.services.user_context import resolve_user
 
 
 class AuthService:
@@ -42,9 +43,11 @@ class AuthService:
 
     async def refresh(self, refresh_token: str) -> TokenResponse:
         payload = decode_token(refresh_token, REFRESH)
-        user = await self._users.get(payload.user_id)
-        if user is None or not user.is_active:
-            raise AuthenticationError(INVALID_TOKEN_MESSAGE)
+        user = await resolve_user(
+            payload.user_id,
+            self._users,
+            inactive_message=INVALID_TOKEN_MESSAGE,
+        )
         return self._issue_tokens(user.id)
 
     @staticmethod
