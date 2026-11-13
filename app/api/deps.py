@@ -1,9 +1,8 @@
-from collections.abc import AsyncIterator, Callable
+from collections.abc import Callable
 from typing import Annotated, Any
 
-from fastapi import Depends, Query
+from fastapi import Depends, Query, Request
 from fastapi.security import OAuth2PasswordBearer
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import CacheBackend, RedisCacheBackend
@@ -49,13 +48,8 @@ def get_notification_service() -> NotificationService:
 NotificationServiceDep = Annotated[NotificationService, Depends(get_notification_service)]
 
 
-async def get_cache_backend() -> AsyncIterator[CacheBackend]:
-    client = Redis.from_url(settings.redis_url, decode_responses=True)
-    backend = RedisCacheBackend(client)
-    try:
-        yield backend
-    finally:
-        await backend.close()
+def get_cache_backend(request: Request) -> CacheBackend:
+    return RedisCacheBackend(request.app.state.redis_client)
 
 
 CacheDep = Annotated[CacheBackend, Depends(get_cache_backend)]

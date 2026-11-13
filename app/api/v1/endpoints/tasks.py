@@ -13,7 +13,12 @@ from app.api.deps import (
     require_task_role,
 )
 from app.api.responses import RBAC_RESPONSES
-from app.core.cache import read_task_cache, write_task_cache
+from app.core.cache import (
+    CACHE_BACKEND_ERRORS,
+    invalidate_task_cache,
+    read_task_cache,
+    write_task_cache,
+)
 from app.models.enums import TaskPriority, TaskStatus, WorkspaceMemberRole
 from app.models.task import Task
 from app.repositories.task_repository import TaskFilters
@@ -59,12 +64,7 @@ async def create_task(
     notification: NotificationServiceDep,
 ) -> Task:
     task = await service.create(access, current_user, payload)
-    try:
-        from app.core.cache import invalidate_task_cache
-
-        await invalidate_task_cache(cache, access.project.id)
-    except Exception:
-        logger.warning("Task cache invalidation failed after task creation", exc_info=True)
+    await invalidate_task_cache(cache, access.project.id)
     if task.assignee is not None and task.assignee.id != current_user.id:
         background_tasks.add_task(
             notify_task_assigned_safely,
@@ -93,7 +93,7 @@ async def list_tasks(
         cache_key, cached = await read_task_cache(cache, access.project.id, filters, pagination)
         if cached is not None:
             return TaskPageResponse.model_validate_json(cached)
-    except Exception:
+    except CACHE_BACKEND_ERRORS:
         logger.warning("Task cache read failed for project_id=%s", access.project.id, exc_info=True)
 
     result = await service.list_tasks(access, filters, pagination)
@@ -103,7 +103,7 @@ async def list_tasks(
     if cache_key is not None:
         try:
             await write_task_cache(cache, cache_key, response.model_dump_json())
-        except Exception:
+        except CACHE_BACKEND_ERRORS:
             logger.warning(
                 "Task cache write failed for project_id=%s", access.project.id, exc_info=True
             )
@@ -127,8 +127,6 @@ async def update_task(
 ) -> Task:
     previous_assignee_id = access.task.assignee_id
     task = await service.update(access, payload)
-    from app.core.cache import invalidate_task_cache
-
     await invalidate_task_cache(cache, access.project.id)
     if (
         "assignee_id" in payload.model_fields_set

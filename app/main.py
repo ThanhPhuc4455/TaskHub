@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api.v1.router import api_router
+from app.core.cache import CACHE_BACKEND_ERRORS, create_redis_client
 from app.core.config import settings
 from app.core.constants import (
     APP_ERROR_CODE,
@@ -41,15 +42,28 @@ async def _cleanup_refresh_tokens_periodically() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    async with engine.connect() as conn:
-        await conn.execute(text("SELECT 1"))  # fail-fast nếu không nối được DB
-    cleanup_task = asyncio.create_task(_cleanup_refresh_tokens_periodically())
+    redis_client = create_redis_client()
+    app.state.redis_client = redis_client
     try:
-        yield
+        try:
+            await redis_client.ping()
+        except CACHE_BACKEND_ERRORS:
+            logger.warning(
+                "Redis unavailable during startup; cache will fall back to DB", exc_info=True
+            )
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))  # fail-fast nếu không nối được DB
+        cleanup_task = asyncio.create_task(_cleanup_refresh_tokens_periodically())
+        try:
+            yield
+        finally:
+            cleanup_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await cleanup_task
     finally:
-        cleanup_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await cleanup_task
+        await redis_client.aclose()
+        with suppress(AttributeError):
+            del app.state.redis_client
         await engine.dispose()
 
 

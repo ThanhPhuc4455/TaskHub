@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from typing import Protocol, cast
 
 from redis.asyncio import Redis
+from redis.exceptions import RedisError
 
 from app.core.config import settings
 from app.core.constants import TASK_CACHE_KEY_PREFIX, TASK_CACHE_TTL_SECONDS
@@ -12,6 +13,7 @@ from app.core.pagination import Pagination
 from app.repositories.task_repository import TaskFilters
 
 logger = logging.getLogger(__name__)
+CACHE_BACKEND_ERRORS = (RedisError, OSError)
 
 
 class CacheBackend(Protocol):
@@ -37,6 +39,15 @@ class RedisCacheBackend:
 
     async def close(self) -> None:
         await self._client.aclose()
+
+
+def create_redis_client() -> Redis:
+    return Redis.from_url(
+        settings.redis_url,
+        decode_responses=True,
+        socket_connect_timeout=settings.redis_socket_connect_timeout,
+        socket_timeout=settings.redis_socket_timeout,
+    )
 
 
 def task_cache_version_key(project_id: int) -> str:
@@ -81,7 +92,7 @@ async def write_task_cache(cache: CacheBackend, key: str, value: str) -> None:
 async def invalidate_task_cache(cache: CacheBackend, project_id: int) -> None:
     try:
         await cache.incr(task_cache_version_key(project_id))
-    except Exception:
+    except CACHE_BACKEND_ERRORS:
         logger.warning(
             "Task cache invalidation failed for project_id=%s", project_id, exc_info=True
         )
