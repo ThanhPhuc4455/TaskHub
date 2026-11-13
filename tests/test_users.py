@@ -54,6 +54,23 @@ async def test_change_password(auth_client: AsyncClient) -> None:
     assert old_password_login.status_code == 401
 
 
+async def test_change_password_revokes_refresh_tokens(auth_client: AsyncClient) -> None:
+    login = await auth_client.post(
+        "/api/v1/auth/login",
+        data={"username": "owner@example.com", "password": "password123"},
+    )
+    refresh_token = login.json()["refresh_token"]
+
+    response = await auth_client.post(
+        f"{ME}/change-password",
+        json={"current_password": "password123", "new_password": "newpassword456"},
+    )
+    assert response.status_code == 204
+    assert (
+        await auth_client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    ).status_code == 401
+
+
 async def test_inactive_user_cannot_refresh_or_read_profile(auth_client: AsyncClient) -> None:
     tokens = await auth_client.post(
         "/api/v1/auth/login",
