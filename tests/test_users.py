@@ -69,9 +69,7 @@ async def test_inactive_user_cannot_refresh_or_read_profile(auth_client: AsyncCl
         user.is_active = False
         await session.commit()
 
-    refresh = await auth_client.post(
-        "/api/v1/auth/refresh", json={"refresh_token": refresh_token}
-    )
+    refresh = await auth_client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
     assert refresh.status_code == 401
     assert refresh.json()["detail"] == "Inactive user"
 
