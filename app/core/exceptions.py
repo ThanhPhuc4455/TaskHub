@@ -29,9 +29,3 @@ class AuthenticationError(AppException):
 class BadRequestError(AppException):
     status_code = 400
     """The request is invalid from a business perspective."""
-
-
-class ForbiddenError(AppException):
-    status_code = 403
-
-    """The authenticated user lacks permission."""
