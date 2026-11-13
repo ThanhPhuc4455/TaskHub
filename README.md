@@ -85,3 +85,45 @@ List endpoints accept `page` and `limit` query parameters. `page` starts at 1 an
 
 Always run `uv run alembic upgrade head` before starting the application. The
 application does not create tables automatically.
+
+## Day 6 runtime features
+
+### Task-list caching
+
+`GET /api/v1/projects/{project_id}/tasks` uses cache-aside Redis caching after
+authentication and workspace RBAC have completed. The version key is
+`project:{project_id}:tasks:ver`; data keys use the current version and a SHA-256
+hash of normalized status, priority, assignee, page, and limit filters. Cached
+responses are JSON and expire after `CACHE_TTL_SECONDS` (120 seconds by default).
+
+Redis failures are logged and transparently fall back to the database. Cache
+versions are incremented after successful commits for task create/update/delete,
+label create/update/delete and attach/detach, project archive/unarchive/delete,
+workspace cascade deletion, and profile changes for users who are task assignees.
+Member removal does not invalidate task lists because it does not change the
+assignee summary stored in a task response. No cache key contains caller data:
+the response is not user-specific after RBAC authorization.
+
+### Assignment notifications
+
+Task assignment notifications use FastAPI `BackgroundTasks` and an injectable
+`NotificationService`. The default implementation logs a safe mail-like event;
+it does not log passwords, tokens, or other sensitive data. A notification is
+queued after a successful task commit when a task is created with another user
+as assignee or when an existing task changes to a new assignee. It is not queued
+for unchanged assignments, unassignment, self-assignment, invalid assignees, or
+failed writes. Notification failures are caught and logged without changing the
+successful API response.
+
+### Request IDs and errors
+
+Every HTTP response includes `X-Request-ID`. A valid client-supplied ID is
+preserved; invalid or oversized IDs are replaced with a UUID4. Request logs
+contain method, path, status, duration, and request ID, but never authorization
+headers or request bodies. Domain, HTTP, validation, and unexpected errors keep
+the existing `detail` field and add `code` and `request_id`. Unexpected errors
+return a generic 500 message while the full traceback remains server-side.
+
+The test suite uses an injectable fake cache and notification service. A real
+Redis integration test can be added separately when Redis is available; the
+normal suite does not require a running Redis instance.
