@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from app.api.responses import SYSTEM_RESPONSES
 from app.api.v1.router import api_router
 from app.core.cache import CACHE_BACKEND_ERRORS, create_redis_client
 from app.core.config import settings
@@ -117,7 +118,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
-@app.get("/health", tags=["system"])
+@app.get("/health", tags=["system"], responses=SYSTEM_RESPONSES)
 async def health() -> dict[str, str]:
     return {"status": "ok"}
 

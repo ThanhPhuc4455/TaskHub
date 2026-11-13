@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 
 from app.api.deps import CacheDep, CurrentUser, UserServiceDep, get_task_repository
+from app.api.responses import USER_RESPONSES
 from app.core.cache import invalidate_task_cache
 from app.models.user import User
 from app.repositories.task_repository import TaskRepository
@@ -11,12 +12,12 @@ from app.schemas.user import ChangePasswordRequest, UserRead, UserUpdate
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.get("/me", response_model=UserRead)
+@router.get("/me", response_model=UserRead, responses=USER_RESPONSES)
 async def read_me(current_user: CurrentUser) -> User:
     return current_user
 
 
-@router.patch("/me", response_model=UserRead)
+@router.patch("/me", response_model=UserRead, responses=USER_RESPONSES)
 async def update_me(
     payload: UserUpdate,
     current_user: CurrentUser,
@@ -31,7 +32,9 @@ async def update_me(
     return user
 
 
-@router.post("/me/change-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/me/change-password", status_code=status.HTTP_204_NO_CONTENT, responses=USER_RESPONSES
+)
 async def change_password(
     payload: ChangePasswordRequest, current_user: CurrentUser, service: UserServiceDep
 ) -> None:
