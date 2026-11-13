@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.exceptions import AuthenticationError
-from app.core.security import create_refresh_token, hash_password
+from app.core.security import TokenType, create_refresh_token, decode_token, hash_password
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
 from app.repositories.refresh_token_repository import RefreshTokenRepository
@@ -78,6 +78,23 @@ async def test_concurrent_refresh_has_one_winner(
         refresh_in_new_session(postgres_sessionmaker, token),
     )
     assert sorted(results) == [False, True]
+
+    old_jti = decode_token(token, TokenType.REFRESH).jti
+    async with postgres_sessionmaker() as session:
+        tokens = list(
+            (await session.scalars(select(RefreshToken).where(RefreshToken.jti == old_jti))).all()
+        )
+        assert len(tokens) == 1
+        assert tokens[0].revoked is True
+        user_tokens = list(
+            (
+                await session.scalars(
+                    select(RefreshToken).where(RefreshToken.user_id == tokens[0].user_id)
+                )
+            ).all()
+        )
+        assert len(user_tokens) == 2
+        assert all(refresh_token.revoked for refresh_token in user_tokens)
 
 
 @pytest.mark.asyncio
