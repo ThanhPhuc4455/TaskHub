@@ -8,7 +8,7 @@ from sqlalchemy import text
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.database import engine
-from app.core.exceptions import AuthenticationError, ConflictError, NotFoundError
+from app.core.exceptions import AppException, AuthenticationError
 
 
 @asynccontextmanager
@@ -22,22 +22,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
 
 
-@app.exception_handler(NotFoundError)
-async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:
-    return JSONResponse(status_code=404, content={"detail": str(exc)})
-
-
-@app.exception_handler(ConflictError)
-async def conflict_handler(request: Request, exc: ConflictError) -> JSONResponse:
-    return JSONResponse(status_code=409, content={"detail": str(exc)})
-
-
-@app.exception_handler(AuthenticationError)
-async def authentication_handler(request: Request, exc: AuthenticationError) -> JSONResponse:
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+    headers = {"WWW-Authenticate": "Bearer"} if isinstance(exc, AuthenticationError) else None
     return JSONResponse(
-        status_code=401,
+        status_code=exc.status_code,
         content={"detail": str(exc)},
-        headers={"WWW-Authenticate": "Bearer"},
+        headers=headers,
     )
 
 

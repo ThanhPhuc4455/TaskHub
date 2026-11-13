@@ -1,10 +1,9 @@
-from app.core.constants import (
+from app.core.exceptions import AuthenticationError, ConflictError
+from app.core.messages import (
     EMAIL_TAKEN_MESSAGE,
     INACTIVE_USER_MESSAGE,
     INVALID_CREDENTIALS_MESSAGE,
-    INVALID_TOKEN_MESSAGE,
 )
-from app.core.exceptions import AuthenticationError, ConflictError
 from app.core.security import (
     REFRESH,
     create_access_token,
@@ -16,6 +15,7 @@ from app.core.security import (
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import RegisterRequest, TokenResponse
+from app.services.user_context import resolve_user
 
 
 class AuthService:
@@ -42,9 +42,7 @@ class AuthService:
 
     async def refresh(self, refresh_token: str) -> TokenResponse:
         payload = decode_token(refresh_token, REFRESH)
-        user = await self._users.get(payload.user_id)
-        if user is None or not user.is_active:
-            raise AuthenticationError(INVALID_TOKEN_MESSAGE)
+        user = await resolve_user(payload.user_id, self._users)
         return self._issue_tokens(user.id)
 
     @staticmethod

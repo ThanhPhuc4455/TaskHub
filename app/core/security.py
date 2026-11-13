@@ -7,8 +7,9 @@ import bcrypt
 import jwt
 
 from app.core.config import settings
-from app.core.constants import INVALID_TOKEN_MESSAGE, PASSWORD_MAX_BYTES, WRONG_TOKEN_TYPE_MESSAGE
+from app.core.constants import PASSWORD_MAX_BYTES
 from app.core.exceptions import AuthenticationError
+from app.core.messages import INVALID_TOKEN_MESSAGE, WRONG_TOKEN_TYPE_MESSAGE
 
 ACCESS = "access"
 REFRESH = "refresh"
@@ -70,8 +71,11 @@ def decode_token(token: str, expected_type: str) -> TokenPayload:
             algorithms=[settings.jwt_algorithm],
             options={"require": ["exp", "sub", "type", "jti"]},
         )
-    except jwt.InvalidTokenError as exc:
+    except (jwt.InvalidTokenError, KeyError, TypeError, ValueError) as exc:
         raise AuthenticationError(INVALID_TOKEN_MESSAGE) from exc
-    if payload["type"] != expected_type:
+    if payload.get("type") != expected_type:
         raise AuthenticationError(WRONG_TOKEN_TYPE_MESSAGE)
-    return TokenPayload(user_id=int(payload["sub"]), jti=payload["jti"])
+    try:
+        return TokenPayload(user_id=int(payload["sub"]), jti=str(payload["jti"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise AuthenticationError(INVALID_TOKEN_MESSAGE) from exc
