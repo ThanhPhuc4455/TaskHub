@@ -16,6 +16,3 @@ async def resolve_user(
     if not user.is_active:
         raise AuthenticationError(inactive_message)
     return user
-
-
-resolve_active_user = resolve_user
