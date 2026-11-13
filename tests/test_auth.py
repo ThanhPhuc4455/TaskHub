@@ -1,3 +1,5 @@
+from typing import cast
+
 from httpx import AsyncClient
 
 AUTH = "/api/v1/auth"
@@ -7,7 +9,7 @@ USER = {"email": "a@example.com", "password": "password123", "full_name": "A"}
 async def login(client: AsyncClient, email: str, password: str) -> dict[str, str]:
     response = await client.post(f"{AUTH}/login", data={"username": email, "password": password})
     assert response.status_code == 200
-    return response.json()
+    return cast(dict[str, str], response.json())
 
 
 async def test_register_hides_password(client: AsyncClient) -> None:
