@@ -1,5 +1,5 @@
-from app.core.constants import FORBIDDEN_MESSAGE
 from app.core.exceptions import ForbiddenError, NotFoundError
+from app.core.messages import FORBIDDEN_MESSAGE
 from app.models.user import User, UserRole
 from app.models.workspace import Workspace
 from app.models.workspace_member import WorkspaceMemberRole

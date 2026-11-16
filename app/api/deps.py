@@ -5,10 +5,8 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.constants import INVALID_TOKEN_MESSAGE
 from app.core.database import get_db_session
-from app.core.exceptions import AuthenticationError
-from app.core.security import ACCESS, decode_token
+from app.core.security import TokenType, decode_token
 from app.models.user import User
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
@@ -16,6 +14,7 @@ from app.repositories.workspace_member_repository import WorkspaceMemberReposito
 from app.repositories.workspace_repository import WorkspaceRepository
 from app.services.auth_service import AuthService
 from app.services.member_service import MemberService
+from app.services.user_context import resolve_user
 from app.services.user_service import UserService
 from app.services.workspace_service import WorkspaceService
 
@@ -57,6 +56,7 @@ def get_member_service(
 
 
 MemberServiceDep = Annotated[MemberService, Depends(get_member_service)]
+UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
 
 
 def get_refresh_token_repository(
@@ -66,7 +66,7 @@ def get_refresh_token_repository(
 
 
 def get_auth_service(
-    users: Annotated[UserRepository, Depends(get_user_repository)],
+    users: UserRepositoryDep,
     tokens: Annotated[RefreshTokenRepository, Depends(get_refresh_token_repository)],
 ) -> AuthService:
     return AuthService(users, tokens)
@@ -80,17 +80,14 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/lo
 
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
-    users: Annotated[UserRepository, Depends(get_user_repository)],
+    users: UserRepositoryDep,
 ) -> User:
-    payload = decode_token(token, ACCESS)
-    user = await users.get(payload.user_id)
-    if user is None or not user.is_active:
-        raise AuthenticationError(INVALID_TOKEN_MESSAGE)
-    return user
+    payload = decode_token(token, TokenType.ACCESS)
+    return await resolve_user(payload.user_id, users)
 
 
 def get_user_service(
-    users: Annotated[UserRepository, Depends(get_user_repository)],
+    users: UserRepositoryDep,
     tokens: Annotated[RefreshTokenRepository, Depends(get_refresh_token_repository)],
 ) -> UserService:
     return UserService(users, tokens)

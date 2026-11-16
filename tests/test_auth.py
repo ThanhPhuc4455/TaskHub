@@ -1,5 +1,10 @@
+from datetime import UTC, datetime, timedelta
+from typing import cast
+
+import jwt
 from httpx import AsyncClient
 
+from app.core.config import settings
 from app.core.security import create_refresh_token
 
 AUTH = "/api/v1/auth"
@@ -9,7 +14,7 @@ USER = {"email": "a@example.com", "password": "password123", "full_name": "A"}
 async def login(client: AsyncClient, email: str, password: str) -> dict[str, str]:
     response = await client.post(f"{AUTH}/login", data={"username": email, "password": password})
     assert response.status_code == 200
-    return response.json()
+    return cast(dict[str, str], response.json())
 
 
 async def test_register_hides_password(client: AsyncClient) -> None:
@@ -93,3 +98,61 @@ async def test_refresh_token_is_rotated(client: AsyncClient) -> None:
 
     new = {"refresh_token": first.json()["refresh_token"]}
     assert (await client.post(f"{AUTH}/refresh", json=new)).status_code == 401
+
+
+async def test_signed_access_token_with_non_numeric_sub_returns_401(
+    client: AsyncClient,
+) -> None:
+    now = datetime.now(UTC)
+    token = jwt.encode(
+        {
+            "sub": "not-a-number",
+            "type": "access",
+            "iat": now,
+            "exp": now + timedelta(minutes=5),
+            "jti": "invalid-sub-test",
+        },
+        settings.secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+    response = await client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 401
+
+
+async def test_signed_access_token_with_empty_sub_returns_401(client: AsyncClient) -> None:
+    now = datetime.now(UTC)
+    token = jwt.encode(
+        {
+            "sub": "",
+            "type": "access",
+            "iat": now,
+            "exp": now + timedelta(minutes=5),
+            "jti": "empty-sub-test",
+        },
+        settings.secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+    response = await client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 401
+
+
+async def test_signed_access_token_without_sub_returns_401(client: AsyncClient) -> None:
+    now = datetime.now(UTC)
+    token = jwt.encode(
+        {
+            "type": "access",
+            "iat": now,
+            "exp": now + timedelta(minutes=5),
+            "jti": "missing-sub-test",
+        },
+        settings.secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+    response = await client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 401

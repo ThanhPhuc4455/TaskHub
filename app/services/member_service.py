@@ -1,5 +1,5 @@
-from app.core.constants import ALREADY_MEMBER_MESSAGE, CANNOT_REMOVE_OWNER_MESSAGE
 from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
+from app.core.messages import ALREADY_MEMBER_MESSAGE, CANNOT_REMOVE_OWNER_MESSAGE
 from app.models.user import User
 from app.models.workspace_member import WorkspaceMember, WorkspaceMemberRole
 from app.repositories.user_repository import UserRepository
