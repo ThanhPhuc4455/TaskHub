@@ -1,7 +1,10 @@
 from datetime import UTC, datetime, timedelta
 
 from httpx import AsyncClient
+from sqlalchemy import select
 
+from app.main import app as fastapi_app
+from app.models.user import User, UserRole
 from tests.helpers import login_as
 
 WS = "/api/v1/workspaces"
@@ -197,3 +200,90 @@ async def test_labels_and_comments_enforce_project_and_comment_rules(
     assert denied.status_code == 404
     deleted = await client.delete(f"/api/v1/tasks/{task_id}/comments/{comment_id}", headers=editor)
     assert deleted.status_code == 204
+
+
+async def test_day5_permission_matrix(client: AsyncClient) -> None:
+    owner = await login_as(client, "matrix-owner@example.com")
+    editor = await login_as(client, "matrix-editor@example.com")
+    other_editor = await login_as(client, "matrix-other-editor@example.com")
+    viewer = await login_as(client, "matrix-viewer@example.com")
+    admin = await login_as(client, "matrix-admin@example.com")
+    project_id = await project_for(client, owner, "Matrix workspace")
+    workspace_id = (await client.get(f"/api/v1/projects/{project_id}", headers=owner)).json()[
+        "workspace_id"
+    ]
+
+    for email, role in (
+        ("matrix-editor@example.com", "EDITOR"),
+        ("matrix-other-editor@example.com", "EDITOR"),
+        ("matrix-viewer@example.com", "VIEWER"),
+    ):
+        response = await client.post(
+            f"{WS}/{workspace_id}/members",
+            json={"email": email, "role": role},
+            headers=owner,
+        )
+        assert response.status_code == 201
+
+    async with fastapi_app.state.test_sessionmaker() as session:
+        user = await session.scalar(select(User).where(User.email == "matrix-admin@example.com"))
+        assert user is not None
+        user.role = UserRole.ADMIN
+        await session.commit()
+
+    task = await client.post(
+        f"/api/v1/projects/{project_id}/tasks", json={"title": "Matrix task"}, headers=owner
+    )
+    assert task.status_code == 201
+    task_id = task.json()["id"]
+    label = await client.post(
+        f"/api/v1/projects/{project_id}/labels",
+        json={"name": "matrix", "color": "#123456"},
+        headers=owner,
+    )
+    assert label.status_code == 201
+    label_id = label.json()["id"]
+
+    assert (
+        await client.post(
+            f"/api/v1/projects/{project_id}/labels",
+            json={"name": "viewer", "color": "#123456"},
+            headers=viewer,
+        )
+    ).status_code == 403
+    assert (
+        await client.post(
+            f"/api/v1/tasks/{task_id}/comments",
+            json={"content": "viewer"},
+            headers=viewer,
+        )
+    ).status_code == 403
+    assert (
+        await client.delete(f"/api/v1/tasks/{task_id}/labels/{label_id}", headers=editor)
+    ).status_code == 404
+
+    comment = await client.post(
+        f"/api/v1/tasks/{task_id}/comments",
+        json={"content": "editor comment"},
+        headers=editor,
+    )
+    assert comment.status_code == 201
+    comment_id = comment.json()["id"]
+    assert (
+        await client.delete(f"/api/v1/tasks/{task_id}/comments/{comment_id}", headers=other_editor)
+    ).status_code == 403
+    assert (
+        await client.delete(f"/api/v1/tasks/{task_id}/comments/{comment_id}", headers=owner)
+    ).status_code == 204
+
+    admin_comment = await client.post(
+        f"/api/v1/tasks/{task_id}/comments",
+        json={"content": "admin target"},
+        headers=editor,
+    )
+    assert admin_comment.status_code == 201
+    assert (
+        await client.delete(
+            f"/api/v1/tasks/{task_id}/comments/{admin_comment.json()['id']}", headers=admin
+        )
+    ).status_code == 204
