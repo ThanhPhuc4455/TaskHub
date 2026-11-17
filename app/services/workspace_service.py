@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from app.core.constants import FORBIDDEN_MESSAGE
 from app.core.exceptions import ForbiddenError, NotFoundError
+from app.core.messages import FORBIDDEN_MESSAGE
 from app.core.pagination import Pagination
 from app.models.user import User, UserRole
 from app.models.workspace import Workspace
@@ -91,14 +91,12 @@ class WorkspaceService:
     async def list_all(self, pagination: Pagination) -> list[Workspace]:
         return await self._workspaces.get_all(offset=pagination.offset, limit=pagination.limit)
 
-    async def get(self, workspace_id: int, user: User) -> Workspace:
-        return await self.require_role(workspace_id, user, WorkspaceMemberRole.VIEWER)
+    async def get(self, workspace: Workspace) -> Workspace:
+        return workspace
 
-    async def update(self, workspace_id: int, user: User, payload: WorkspaceUpdate) -> Workspace:
-        workspace = await self.require_role(workspace_id, user, WorkspaceMemberRole.OWNER)
+    async def update(self, workspace: Workspace, payload: WorkspaceUpdate) -> Workspace:
         data = payload.model_dump(exclude_unset=True)
         return await self._workspaces.update(workspace, data)
 
-    async def delete(self, workspace_id: int, user: User) -> None:
-        workspace = await self.require_role(workspace_id, user, WorkspaceMemberRole.OWNER)
+    async def delete(self, workspace: Workspace) -> None:
         await self._workspaces.delete(workspace)

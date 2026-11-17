@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Annotated, Any
 
 from fastapi import Depends, Query
@@ -6,13 +6,14 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.constants import FORBIDDEN_MESSAGE, INVALID_TOKEN_MESSAGE
 from app.core.database import get_db_session
-from app.core.exceptions import AuthenticationError, ForbiddenError
+from app.core.exceptions import ForbiddenError
+from app.core.messages import FORBIDDEN_MESSAGE
 from app.core.pagination import Pagination
-from app.core.security import ACCESS, decode_token
+from app.core.security import TokenType, decode_token
 from app.models.enums import WorkspaceMemberRole
 from app.models.user import User, UserRole
+from app.models.workspace import Workspace
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
@@ -21,9 +22,9 @@ from app.repositories.workspace_repository import WorkspaceRepository
 from app.services.auth_service import AuthService
 from app.services.member_service import MemberService
 from app.services.project_service import ProjectAccessContext, ProjectService
+from app.services.user_context import resolve_user
 from app.services.user_service import UserService
 from app.services.workspace_service import (
-    WorkspaceAccessContext,
     WorkspaceService,
     authorize_resource,
 )
@@ -92,6 +93,7 @@ def get_member_service(
 
 
 MemberServiceDep = Annotated[MemberService, Depends(get_member_service)]
+UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
 
 
 def get_refresh_token_repository(
@@ -101,7 +103,7 @@ def get_refresh_token_repository(
 
 
 def get_auth_service(
-    users: Annotated[UserRepository, Depends(get_user_repository)],
+    users: UserRepositoryDep,
     tokens: Annotated[RefreshTokenRepository, Depends(get_refresh_token_repository)],
 ) -> AuthService:
     return AuthService(users, tokens)
@@ -115,17 +117,14 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/lo
 
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
-    users: Annotated[UserRepository, Depends(get_user_repository)],
+    users: UserRepositoryDep,
 ) -> User:
-    payload = decode_token(token, ACCESS)
-    user = await users.get(payload.user_id)
-    if user is None or not user.is_active:
-        raise AuthenticationError(INVALID_TOKEN_MESSAGE)
-    return user
+    payload = decode_token(token, TokenType.ACCESS)
+    return await resolve_user(payload.user_id, users)
 
 
 def get_user_service(
-    users: Annotated[UserRepository, Depends(get_user_repository)],
+    users: UserRepositoryDep,
     tokens: Annotated[RefreshTokenRepository, Depends(get_refresh_token_repository)],
 ) -> UserService:
     return UserService(users, tokens)
@@ -144,15 +143,27 @@ def require_admin(current_user: CurrentUser) -> User:
 AdminUser = Annotated[User, Depends(require_admin)]
 
 
-def require_workspace_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
+def require_workspace_role(
+    required: WorkspaceMemberRole,
+) -> Callable[..., Awaitable[Workspace]]:
     async def dependency(
         workspace_id: int,
-        service: WorkspaceServiceDep,
         current_user: CurrentUser,
-    ) -> WorkspaceAccessContext:
-        return await service.authorize(workspace_id, current_user, required)
+        service: WorkspaceServiceDep,
+    ) -> Workspace:
+        return await service.require_role(workspace_id, current_user, required)
 
     return dependency
+
+
+WorkspaceViewer = Annotated[
+    Workspace,
+    Depends(require_workspace_role(WorkspaceMemberRole.VIEWER)),
+]
+WorkspaceOwner = Annotated[
+    Workspace,
+    Depends(require_workspace_role(WorkspaceMemberRole.OWNER)),
+]
 
 
 def require_project_role(required: WorkspaceMemberRole) -> Callable[..., Any]:

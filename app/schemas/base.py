@@ -2,6 +2,8 @@ from typing import ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from app.core.messages import FIELD_MUST_NOT_BE_NULL_MESSAGE
+
 
 class BaseSchema(BaseModel):
     """Schema nhận dữ liệu từ client: tự cắt khoảng trắng hai đầu chuỗi."""
@@ -18,5 +20,5 @@ class BasePatchSchema(BaseSchema):
     def reject_explicit_null(self) -> Self:
         for field in self.model_fields_set:
             if field not in self.nullable_fields and getattr(self, field) is None:
-                raise ValueError(f"{field} must not be null")
+                raise ValueError(FIELD_MUST_NOT_BE_NULL_MESSAGE.format(field=field))
         return self

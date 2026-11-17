@@ -23,7 +23,8 @@ def upgrade() -> None:
         """
         INSERT INTO workspace_members (workspace_id, user_id, role)
         SELECT id, owner_id, 'OWNER' FROM workspaces
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (workspace_id, user_id)
+        DO UPDATE SET role = 'OWNER'
         """
     )
 

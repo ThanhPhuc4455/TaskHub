@@ -11,18 +11,18 @@ from app.api.deps import (
 from app.api.responses import RBAC_RESPONSES
 from app.models.enums import WorkspaceMemberRole
 from app.models.project import Project
+from app.models.workspace import Workspace
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
 from app.services.project_service import ProjectAccessContext
-from app.services.workspace_service import WorkspaceAccessContext
 
 router = APIRouter(tags=["projects"], responses=RBAC_RESPONSES)
 
 WorkspaceViewer = Annotated[
-    WorkspaceAccessContext,
+    Workspace,
     Depends(require_workspace_role(WorkspaceMemberRole.VIEWER)),
 ]
 WorkspaceEditor = Annotated[
-    WorkspaceAccessContext,
+    Workspace,
     Depends(require_workspace_role(WorkspaceMemberRole.EDITOR)),
 ]
 ProjectViewer = Annotated[
