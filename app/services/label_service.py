@@ -65,18 +65,21 @@ class LabelService:
         ensure_project_active(access.project)
         await self._labels.delete(access.label)
 
-    async def attach(self, task: TaskAccessContext, label: Label) -> None:
+    async def attach(self, task: TaskAccessContext, label_id: int) -> None:
         ensure_project_active(task.project)
+        label = await self._labels.get(label_id)
+        if label is None:
+            raise NotFoundError("Label", label_id)
         if label.project_id != task.project.id:
             raise BadRequestError(LABEL_PROJECT_MISMATCH_MESSAGE)
-        try:
-            await self._tasks.attach_label(task.task.id, label.id)
-        except IntegrityError as exc:
-            await self._tasks.rollback()
-            raise ConflictError(LABEL_ALREADY_ATTACHED_MESSAGE) from exc
+        if await self._tasks.attach_label(task.task.id, label.id) == 0:
+            raise ConflictError(LABEL_ALREADY_ATTACHED_MESSAGE)
 
-    async def detach(self, task: TaskAccessContext, label: Label) -> None:
+    async def detach(self, task: TaskAccessContext, label_id: int) -> None:
         ensure_project_active(task.project)
+        label = await self._labels.get(label_id)
+        if label is None:
+            raise NotFoundError("Label", label_id)
         if label.project_id != task.project.id:
             raise BadRequestError(LABEL_PROJECT_MISMATCH_MESSAGE)
         if await self._tasks.detach_label(task.task.id, label.id) == 0:

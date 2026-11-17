@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, status
 from app.api.deps import (
     LabelServiceDep,
     PaginationDep,
-    require_label_role,
     require_project_role,
     require_task_role,
 )
@@ -33,7 +32,7 @@ TaskEditor = Annotated[
 ]
 LabelEditor = Annotated[
     LabelAccessContext,
-    Depends(require_label_role(WorkspaceMemberRole.EDITOR)),
+    Depends(require_project_role(WorkspaceMemberRole.EDITOR)),
 ]
 
 
@@ -70,16 +69,16 @@ async def delete_label(access: LabelEditor, service: LabelServiceDep) -> None:
 @router.post("/tasks/{task_id}/labels/{label_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def attach_label(
     task: TaskEditor,
-    label: LabelEditor,
+    label_id: int,
     service: LabelServiceDep,
 ) -> None:
-    await service.attach(task, label.label)
+    await service.attach(task, label_id)
 
 
 @router.delete("/tasks/{task_id}/labels/{label_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def detach_label(
     task: TaskEditor,
-    label: LabelEditor,
+    label_id: int,
     service: LabelServiceDep,
 ) -> None:
-    await service.detach(task, label.label)
+    await service.detach(task, label_id)
