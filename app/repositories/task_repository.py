@@ -7,6 +7,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.pagination import Pagination
 from app.models.label import task_labels
 from app.models.task import Task, TaskPriority, TaskStatus
 from app.repositories.base import BaseRepository
@@ -47,7 +48,7 @@ class TaskRepository(BaseRepository[Task]):
         )
 
     async def list_by_project(
-        self, project_id: int, filters: TaskFilters, *, offset: int, limit: int
+        self, project_id: int, filters: TaskFilters, pagination: Pagination
     ) -> TaskPage:
         conditions = self._where(project_id, filters)
         total = await self.session.scalar(select(func.count()).select_from(Task).where(*conditions))
@@ -56,8 +57,8 @@ class TaskRepository(BaseRepository[Task]):
             .where(*conditions)
             .options(selectinload(Task.labels), selectinload(Task.assignee))
             .order_by(Task.created_at.desc(), Task.id.desc())
-            .offset(offset)
-            .limit(limit)
+            .offset(pagination.offset)
+            .limit(pagination.limit)
         )
         result = await self.session.scalars(stmt)
         return TaskPage(items=list(result.all()), total=total or 0)

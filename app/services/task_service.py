@@ -71,8 +71,7 @@ class TaskService:
         return await self._tasks.list_by_project(
             access.project.id,
             filters,
-            offset=pagination.offset,
-            limit=pagination.limit,
+            pagination,
         )
 
     async def get(self, access: TaskAccessContext) -> Task:
