@@ -4,11 +4,11 @@ from pydantic import ConfigDict, Field, field_validator
 
 from app.core.constants import (
     COLOR_MAX_LENGTH,
-    INVALID_COLOR_MESSAGE,
     LABEL_NAME_MAX_LENGTH,
     LABEL_NAME_MIN_LENGTH,
 )
-from app.schemas.base import BasePatchSchema, BaseSchema, PageResponse
+from app.core.messages import INVALID_COLOR_MESSAGE
+from app.schemas.base import BasePatchSchema, BaseSchema
 
 
 class LabelCreate(BaseSchema):
@@ -46,7 +46,3 @@ class LabelRead(BaseSchema):
     project_id: int
     name: str
     color: str
-
-
-class LabelPageResponse(PageResponse[LabelRead]):
-    pass

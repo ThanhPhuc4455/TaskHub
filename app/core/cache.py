@@ -99,7 +99,10 @@ async def invalidate_task_cache(cache: CacheBackend, project_id: int) -> None:
 
 
 def task_cache_payload_json(items: Sequence[object], total: int, page: int, limit: int) -> str:
-    from app.schemas.task import TaskPageResponse
+    from app.schemas.page import PageResponse
+    from app.schemas.task import TaskRead
 
-    payload = TaskPageResponse(items=list(items), total=total, page=page, limit=limit)
+    payload = PageResponse[TaskRead](
+        items=cast(list[TaskRead], list(items)), total=total, page=page, limit=limit
+    )
     return payload.model_dump_json()

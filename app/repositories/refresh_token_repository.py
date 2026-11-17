@@ -37,9 +37,11 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
         await self._flush_or_commit(commit)
         return int(getattr(result, "rowcount", 0) or 0)
 
-    async def delete_expired_or_revoked(self) -> int:
-        """Delete only expired tokens so revoked-token reuse remains detectable."""
+    async def delete_expired(self) -> int:
         stmt = delete(RefreshToken).where(RefreshToken.expires_at <= datetime.now(UTC))
         result = await self.session.execute(stmt)
         await self.commit()
         return int(getattr(result, "rowcount", 0) or 0)
+
+    async def delete_expired_or_revoked(self) -> int:
+        return await self.delete_expired()

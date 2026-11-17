@@ -8,11 +8,11 @@ from typing import Any, cast
 
 from app.core.constants import (
     INTERNAL_SERVER_ERROR_CODE,
-    INTERNAL_SERVER_ERROR_MESSAGE,
     REQUEST_ID_ALLOWED_PATTERN,
     REQUEST_ID_HEADER,
     REQUEST_ID_MAX_LENGTH,
 )
+from app.core.messages import INTERNAL_SERVER_ERROR_MESSAGE
 
 logger = logging.getLogger(__name__)
 request_id_context: ContextVar[str] = ContextVar("request_id", default="-")

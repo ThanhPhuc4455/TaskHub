@@ -1,11 +1,12 @@
+from typing import ClassVar
+
+from app.core.constants import APP_ERROR_CODE
 from app.core.messages import NOT_FOUND_MESSAGE
 
 
 class AppException(Exception):
-    status_code = 500
-
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
+    status_code: ClassVar[int] = 500
+    code: ClassVar[str] = APP_ERROR_CODE
 
 
 class NotFoundError(AppException):
@@ -30,6 +31,11 @@ class AuthenticationError(AppException):
 class BadRequestError(AppException):
     status_code = 400
     """The request is invalid from a business perspective."""
+
+
+class UnprocessableEntityError(AppException):
+    status_code = 422
+    """The request is well-formed but violates domain validation."""
 
 
 class ForbiddenError(AppException):

@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import delete, func, insert, select
+from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -67,9 +69,17 @@ class TaskRepository(BaseRepository[Task]):
         )
         return list(result.all())
 
-    async def attach_label(self, task_id: int, label_id: int, *, commit: bool = True) -> None:
-        await self.session.execute(insert(task_labels).values(task_id=task_id, label_id=label_id))
+    async def attach_label(self, task_id: int, label_id: int, *, commit: bool = True) -> int:
+        insert_factory = (
+            pg_insert
+            if self.session.sync_session.get_bind().dialect.name == "postgresql"
+            else sqlite_insert
+        )
+        statement = insert_factory(task_labels).values(task_id=task_id, label_id=label_id)
+        statement = statement.on_conflict_do_nothing()
+        result = await self.session.execute(statement)
         await self._flush_or_commit(commit)
+        return int(getattr(result, "rowcount", 0) or 0)
 
     async def detach_label(self, task_id: int, label_id: int, *, commit: bool = True) -> int:
         result = await self.session.execute(

@@ -1,8 +1,9 @@
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, status
 
 from app.api.deps import (
+    CacheDep,
     CommentServiceDep,
     CurrentUser,
     PaginationDep,
@@ -10,9 +11,11 @@ from app.api.deps import (
     require_task_role,
 )
 from app.api.responses import RBAC_RESPONSES
+from app.core.cache import invalidate_task_cache
 from app.models.comment import Comment
 from app.models.enums import WorkspaceMemberRole
-from app.schemas.comment import CommentCreate, CommentPageResponse, CommentRead
+from app.schemas.comment import CommentCreate, CommentRead
+from app.schemas.page import PageResponse
 from app.services.comment_service import CommentAccessContext
 from app.services.task_service import TaskAccessContext
 
@@ -42,17 +45,20 @@ async def create_comment(
     task: TaskEditor,
     current_user: CurrentUser,
     service: CommentServiceDep,
+    cache: CacheDep,
 ) -> Comment:
-    return await service.create(task, current_user, payload)
+    comment = await service.create(task, current_user, payload)
+    await invalidate_task_cache(cache, task.project.id)
+    return comment
 
 
-@router.get("/tasks/{task_id}/comments", response_model=CommentPageResponse)
+@router.get("/tasks/{task_id}/comments", response_model=PageResponse[CommentRead])
 async def list_comments(
     task: TaskViewer, service: CommentServiceDep, pagination: PaginationDep
-) -> CommentPageResponse:
-    result = await service.list_comments(task, pagination)
-    return CommentPageResponse(
-        items=result.items, total=result.total, page=pagination.page, limit=pagination.limit
+) -> PageResponse[CommentRead]:
+    comments, total = await service.list_comments(task, pagination)
+    return PageResponse.from_result(
+        cast(list[CommentRead], comments), total, pagination.page, pagination.limit
     )
 
 
@@ -61,5 +67,7 @@ async def delete_comment(
     access: CommentViewer,
     current_user: CurrentUser,
     service: CommentServiceDep,
+    cache: CacheDep,
 ) -> None:
     await service.delete(access, current_user)
+    await invalidate_task_cache(cache, access.task.project.id)

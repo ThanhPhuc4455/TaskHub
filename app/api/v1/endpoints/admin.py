@@ -1,19 +1,24 @@
+from typing import cast
+
 from fastapi import APIRouter
 
 from app.api.deps import AdminUser, PaginationDep, WorkspaceServiceDep
 from app.api.responses import RBAC_RESPONSES
-from app.schemas.workspace import WorkspacePageResponse
+from app.schemas.page import PageResponse
+from app.schemas.workspace import WorkspaceRead
 
 router = APIRouter(prefix="/admin", tags=["admin"], responses=RBAC_RESPONSES)
 
 
-@router.get("/workspaces", response_model=WorkspacePageResponse, summary="List all workspaces")
+@router.get(
+    "/workspaces", response_model=PageResponse[WorkspaceRead], summary="List all workspaces"
+)
 async def list_all_workspaces(
     _: AdminUser,
     service: WorkspaceServiceDep,
     pagination: PaginationDep,
-) -> WorkspacePageResponse:
-    result = await service.list_all(pagination)
-    return WorkspacePageResponse(
-        items=result.items, total=result.total, page=pagination.page, limit=pagination.limit
+) -> PageResponse[WorkspaceRead]:
+    items, total = await service.list_all(pagination)
+    return PageResponse.from_result(
+        cast(list[WorkspaceRead], items), total, pagination.page, pagination.limit
     )

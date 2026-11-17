@@ -3,7 +3,7 @@ from typing import Any
 from sqlalchemy import func, inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.pagination import PageResult, Pagination
+from app.core.constants import MAX_PAGE_SIZE
 from app.models.base import Base
 
 
@@ -34,23 +34,20 @@ class BaseRepository[ModelT: Base]:
     async def get(self, obj_id: int) -> ModelT | None:
         return await self.session.get(self.model, obj_id)
 
-    async def get_all(self, *, offset: int = 0, limit: int = 100) -> list[ModelT]:
+    async def get_all(self, *, offset: int = 0, limit: int = MAX_PAGE_SIZE) -> list[ModelT]:
         primary_key = inspect(self.model).primary_key[0]
         stmt = select(self.model).order_by(primary_key).offset(offset).limit(limit)
         result = await self.session.scalars(stmt)
         return list(result.all())
 
-    async def get_page(self, pagination: Pagination) -> PageResult[ModelT]:
-        total = await self.count()
+    async def get_page(
+        self, *, offset: int = 0, limit: int = MAX_PAGE_SIZE
+    ) -> tuple[list[ModelT], int]:
         primary_key = inspect(self.model).primary_key[0]
-        stmt = (
-            select(self.model)
-            .order_by(primary_key)
-            .offset(pagination.offset)
-            .limit(pagination.limit)
-        )
+        total = int(await self.session.scalar(select(func.count()).select_from(self.model)) or 0)
+        stmt = select(self.model).order_by(primary_key).offset(offset).limit(limit)
         result = await self.session.scalars(stmt)
-        return PageResult(items=list(result.all()), total=total)
+        return list(result.all()), total
 
     async def count(self) -> int:
         result = await self.session.scalar(select(func.count()).select_from(self.model))

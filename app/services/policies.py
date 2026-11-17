@@ -1,7 +1,7 @@
 from typing import Protocol
 
-from app.core.constants import COMMENT_NOT_OWNER_MESSAGE, PROJECT_ARCHIVED_MESSAGE
 from app.core.exceptions import ConflictError, ForbiddenError
+from app.core.messages import COMMENT_NOT_OWNER_MESSAGE, PROJECT_ARCHIVED_MESSAGE
 from app.models.enums import ProjectStatus, WorkspaceMemberRole
 from app.models.project import Project
 from app.models.user import User

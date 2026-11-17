@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, status
 
@@ -6,7 +6,6 @@ from app.api.deps import (
     CacheDep,
     LabelServiceDep,
     PaginationDep,
-    require_label_role,
     require_project_role,
     require_task_role,
 )
@@ -14,7 +13,8 @@ from app.api.responses import RBAC_RESPONSES
 from app.core.cache import invalidate_task_cache
 from app.models.enums import WorkspaceMemberRole
 from app.models.label import Label
-from app.schemas.label import LabelCreate, LabelPageResponse, LabelRead, LabelUpdate
+from app.schemas.label import LabelCreate, LabelRead, LabelUpdate
+from app.schemas.page import PageResponse
 from app.services.label_service import LabelAccessContext
 from app.services.project_service import ProjectAccessContext
 from app.services.task_service import TaskAccessContext
@@ -35,7 +35,7 @@ TaskEditor = Annotated[
 ]
 LabelEditor = Annotated[
     LabelAccessContext,
-    Depends(require_label_role(WorkspaceMemberRole.EDITOR)),
+    Depends(require_project_role(WorkspaceMemberRole.EDITOR)),
 ]
 
 
@@ -52,13 +52,13 @@ async def create_label(
     return label
 
 
-@router.get("/projects/{project_id}/labels", response_model=LabelPageResponse)
+@router.get("/projects/{project_id}/labels", response_model=PageResponse[LabelRead])
 async def list_labels(
     access: ProjectViewer, service: LabelServiceDep, pagination: PaginationDep
-) -> LabelPageResponse:
-    result = await service.list_labels(access, pagination)
-    return LabelPageResponse(
-        items=result.items, total=result.total, page=pagination.page, limit=pagination.limit
+) -> PageResponse[LabelRead]:
+    items, total = await service.list_labels(access, pagination)
+    return PageResponse.from_result(
+        cast(list[LabelRead], items), total, pagination.page, pagination.limit
     )
 
 

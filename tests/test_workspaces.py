@@ -45,4 +45,13 @@ async def test_workspace_list_supports_pagination(auth_client: AsyncClient) -> N
 
     response = await auth_client.get(f"{BASE}?page=2&limit=1")
     assert response.status_code == 200
-    assert [workspace["name"] for workspace in response.json()["items"]] == ["Team B"]
+    body = response.json()
+    assert [workspace["name"] for workspace in body["items"]] == ["Team B"]
+    assert body["total"] == 2
+    assert body["page"] == 2
+    assert body["limit"] == 1
+
+
+async def test_pagination_rejects_limit_above_max(auth_client: AsyncClient) -> None:
+    response = await auth_client.get(f"{BASE}?limit=101")
+    assert response.status_code == 422

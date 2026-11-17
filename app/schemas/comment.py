@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import ConfigDict, Field
 
 from app.core.constants import COMMENT_CONTENT_MAX_LENGTH, COMMENT_CONTENT_MIN_LENGTH
-from app.schemas.base import BaseSchema, PageResponse
+from app.schemas.base import BaseSchema
 from app.schemas.user import UserSummary
 
 
@@ -22,7 +22,3 @@ class CommentRead(BaseSchema):
     author: UserSummary | None
     content: str
     created_at: datetime
-
-
-class CommentPageResponse(PageResponse[CommentRead]):
-    pass

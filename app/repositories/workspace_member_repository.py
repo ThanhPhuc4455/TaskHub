@@ -1,7 +1,7 @@
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.pagination import PageResult, Pagination
+from app.core.constants import MAX_PAGE_SIZE
 from app.models.workspace_member import WorkspaceMember
 from app.repositories.base import BaseRepository
 
@@ -14,19 +14,22 @@ class WorkspaceMemberRepository(BaseRepository[WorkspaceMember]):
         return await self.session.get(WorkspaceMember, (workspace_id, user_id))
 
     async def list_by_workspace(
-        self, workspace_id: int, pagination: Pagination
-    ) -> PageResult[WorkspaceMember]:
-        total = await self.session.scalar(
-            select(func.count())
-            .select_from(WorkspaceMember)
-            .where(WorkspaceMember.workspace_id == workspace_id)
+        self, workspace_id: int, *, offset: int = 0, limit: int = MAX_PAGE_SIZE
+    ) -> tuple[list[WorkspaceMember], int]:
+        total = int(
+            await self.session.scalar(
+                select(func.count())
+                .select_from(WorkspaceMember)
+                .where(WorkspaceMember.workspace_id == workspace_id)
+            )
+            or 0
         )
         stmt = (
             select(WorkspaceMember)
             .where(WorkspaceMember.workspace_id == workspace_id)
             .order_by(WorkspaceMember.user_id)
-            .offset(pagination.offset)
-            .limit(pagination.limit)
+            .offset(offset)
+            .limit(limit)
         )
         result = await self.session.scalars(stmt)
-        return PageResult(items=list(result.all()), total=total or 0)
+        return list(result.all()), total

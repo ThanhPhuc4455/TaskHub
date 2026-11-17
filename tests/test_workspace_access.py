@@ -11,6 +11,7 @@ async def test_owner_sees_own_workspace(client: AsyncClient) -> None:
     assert created.status_code == 201
     listing = await client.get(WS, headers=owner)
     assert [workspace["name"] for workspace in listing.json()["items"]] == ["Team A"]
+    assert listing.json()["total"] == 1
 
 
 async def test_other_user_does_not_see_workspace(client: AsyncClient) -> None:

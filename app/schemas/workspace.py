@@ -3,7 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.constants import WORKSPACE_NAME_MAX_LENGTH, WORKSPACE_NAME_MIN_LENGTH
-from app.schemas.base import BasePatchSchema, BaseSchema, PageResponse
+from app.schemas.base import BasePatchSchema, BaseSchema
 
 
 class WorkspaceCreate(BaseSchema):
@@ -28,7 +28,3 @@ class WorkspaceRead(BaseModel):
     name: str
     owner_id: int
     created_at: datetime
-
-
-class WorkspacePageResponse(PageResponse[WorkspaceRead]):
-    pass

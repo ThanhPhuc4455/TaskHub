@@ -14,15 +14,14 @@ from app.api.v1.router import api_router
 from app.core.cache import CACHE_BACKEND_ERRORS, create_redis_client
 from app.core.config import settings
 from app.core.constants import (
-    APP_ERROR_CODE,
     HTTP_ERROR_CODE,
     INTERNAL_SERVER_ERROR_CODE,
-    INTERNAL_SERVER_ERROR_MESSAGE,
     REFRESH_TOKEN_CLEANUP_INTERVAL_SECONDS,
     VALIDATION_ERROR_CODE,
 )
 from app.core.database import AsyncSessionLocal, engine
 from app.core.exceptions import AppException
+from app.core.messages import INTERNAL_SERVER_ERROR_MESSAGE
 from app.core.middleware import RequestLoggingMiddleware
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 
@@ -85,7 +84,7 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
     headers = {"WWW-Authenticate": "Bearer"} if exc.status_code == 401 else None
     return JSONResponse(
         status_code=exc.status_code,
-        content=_error_content(str(exc), APP_ERROR_CODE, request),
+        content=_error_content(str(exc), exc.code, request),
         headers=headers,
     )
 
