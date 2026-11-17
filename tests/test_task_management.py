@@ -43,6 +43,26 @@ async def test_task_crud_filters_and_pagination(client: AsyncClient) -> None:
     assert listed.json()["total"] == 1
     assert listed.json()["items"][0]["id"] == task_id
 
+    multi_filter = await client.get(
+        f"/api/v1/projects/{project_id}/tasks?priority=HIGH&priority=MEDIUM",
+        headers=owner,
+    )
+    assert multi_filter.status_code == 200
+    assert multi_filter.json()["total"] == 2
+
+    empty_filter = await client.get(
+        f"/api/v1/projects/{project_id}/tasks?status=IN_REVIEW",
+        headers=owner,
+    )
+    assert empty_filter.status_code == 200
+    assert empty_filter.json()["total"] == 0
+
+    invalid_filter = await client.get(
+        f"/api/v1/projects/{project_id}/tasks?status=NOT_A_STATUS",
+        headers=owner,
+    )
+    assert invalid_filter.status_code == 422
+
     updated = await client.patch(
         f"/api/v1/tasks/{task_id}",
         json={"description": None, "status": "IN_PROGRESS"},

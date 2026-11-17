@@ -57,8 +57,8 @@ async def list_tasks(
     access: ProjectViewer,
     service: TaskServiceDep,
     pagination: PaginationDep,
-    status_filter: Annotated[TaskStatus | None, Query(alias="status")] = None,
-    priority: TaskPriority | None = None,
+    status_filter: Annotated[list[TaskStatus] | None, Query(alias="status")] = None,
+    priority: Annotated[list[TaskPriority] | None, Query()] = None,
     assignee_id: Annotated[int | None, Query(ge=1)] = None,
 ) -> PageResponse[TaskRead]:
     result = await service.list_tasks(
