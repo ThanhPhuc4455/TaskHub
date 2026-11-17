@@ -22,9 +22,7 @@ async def list_workspaces(
 
 
 @router.get("/{workspace_id}", response_model=WorkspaceRead)
-async def get_workspace(
-    workspace: WorkspaceViewer, service: WorkspaceServiceDep
-) -> Workspace:
+async def get_workspace(workspace: WorkspaceViewer, service: WorkspaceServiceDep) -> Workspace:
     return await service.get(workspace)
 
 
@@ -39,7 +37,5 @@ async def update_workspace(
 
 
 @router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_workspace(
-    service: WorkspaceServiceDep, workspace: WorkspaceOwner
-) -> None:
+async def delete_workspace(service: WorkspaceServiceDep, workspace: WorkspaceOwner) -> None:
     await service.delete(workspace)

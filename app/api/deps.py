@@ -1,3 +1,4 @@
+from collections.abc import Awaitable, Callable
 from typing import Annotated
 
 from fastapi import Depends
@@ -99,7 +100,9 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
 
 
-def require_workspace_role(required: WorkspaceMemberRole):
+def require_workspace_role(
+    required: WorkspaceMemberRole,
+) -> Callable[..., Awaitable[Workspace]]:
     async def dependency(
         workspace_id: int,
         current_user: CurrentUser,
