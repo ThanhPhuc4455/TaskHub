@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, status
 
@@ -12,6 +12,7 @@ from app.api.responses import RBAC_RESPONSES
 from app.models.enums import WorkspaceMemberRole
 from app.models.project import Project
 from app.models.workspace import Workspace
+from app.schemas.page import PageResponse
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
 from app.services.project_service import ProjectAccessContext
 
@@ -55,15 +56,18 @@ async def create_project(
 
 @router.get(
     "/workspaces/{workspace_id}/projects",
-    response_model=list[ProjectRead],
+    response_model=PageResponse[ProjectRead],
     summary="List workspace projects",
 )
 async def list_projects(
     access: WorkspaceViewer,
     service: ProjectServiceDep,
     pagination: PaginationDep,
-) -> list[Project]:
-    return await service.list_for_workspace(access, pagination)
+) -> PageResponse[ProjectRead]:
+    items, total = await service.list_for_workspace(access, pagination)
+    return PageResponse.from_result(
+        cast(list[ProjectRead], items), total, pagination.page, pagination.limit
+    )
 
 
 @router.get("/projects/{project_id}", response_model=ProjectRead, summary="Get a project")

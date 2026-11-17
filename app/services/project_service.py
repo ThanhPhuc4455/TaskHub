@@ -30,7 +30,9 @@ class ProjectService:
             description=payload.description,
         )
 
-    async def list_for_workspace(self, access: Workspace, pagination: Pagination) -> list[Project]:
+    async def list_for_workspace(
+        self, access: Workspace, pagination: Pagination
+    ) -> tuple[list[Project], int]:
         return await self._projects.list_by_workspace(
             access.id, offset=pagination.offset, limit=pagination.limit
         )

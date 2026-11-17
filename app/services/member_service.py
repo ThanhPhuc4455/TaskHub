@@ -28,7 +28,7 @@ class MemberService:
 
     async def list_members(
         self, workspace_id: int, pagination: Pagination
-    ) -> list[WorkspaceMember]:
+    ) -> tuple[list[WorkspaceMember], int]:
         return await self._members.list_by_workspace(
             workspace_id, offset=pagination.offset, limit=pagination.limit
         )

@@ -6,6 +6,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.constants import DEFAULT_PAGE, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from app.core.database import get_db_session
 from app.core.exceptions import ForbiddenError
 from app.core.messages import FORBIDDEN_MESSAGE
@@ -34,8 +35,8 @@ def get_workspace_repository(
 
 
 def get_pagination(
-    page: int = Query(1, ge=1),
-    limit: int = Query(100, ge=1, le=100),
+    page: Annotated[int, Query(ge=1)] = DEFAULT_PAGE,
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
 ) -> Pagination:
     return Pagination(page=page, limit=limit)
 

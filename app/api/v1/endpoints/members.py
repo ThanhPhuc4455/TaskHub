@@ -1,3 +1,5 @@
+from typing import cast
+
 from fastapi import APIRouter, status
 
 from app.api.deps import (
@@ -9,6 +11,7 @@ from app.api.deps import (
 from app.api.responses import RBAC_RESPONSES
 from app.models.workspace_member import WorkspaceMember
 from app.schemas.member import InviteMemberRequest, MemberRead, UpdateMemberRoleRequest
+from app.schemas.page import PageResponse
 
 router = APIRouter(
     prefix="/workspaces/{workspace_id}/members",
@@ -17,14 +20,17 @@ router = APIRouter(
 )
 
 
-@router.get("", response_model=list[MemberRead])
+@router.get("", response_model=PageResponse[MemberRead])
 async def list_members(
     workspace_id: int,
     service: MemberServiceDep,
     workspace: WorkspaceViewer,
     pagination: PaginationDep,
-) -> list[WorkspaceMember]:
-    return await service.list_members(workspace_id, pagination)
+) -> PageResponse[MemberRead]:
+    items, total = await service.list_members(workspace_id, pagination)
+    return PageResponse.from_result(
+        cast(list[MemberRead], items), total, pagination.page, pagination.limit
+    )
 
 
 @router.post("", response_model=MemberRead, status_code=status.HTTP_201_CREATED)

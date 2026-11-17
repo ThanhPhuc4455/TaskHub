@@ -133,11 +133,21 @@ async def test_project_list_supports_pagination(client: AsyncClient) -> None:
         assert response.status_code == 201
 
     response = await client.get(
-        f"{WS}/{workspace_id}/projects?page=2&limit=1",
+        f"{WS}/{workspace_id}/projects?page=1&limit=1",
         headers=owner,
     )
     assert response.status_code == 200
-    assert [project["name"] for project in response.json()] == ["Project B"]
+    first_page = response.json()
+    assert [project["name"] for project in first_page["items"]] == ["Project A"]
+    assert first_page["total"] == 2
+
+    response = await client.get(
+        f"{WS}/{workspace_id}/projects?page=2&limit=1",
+        headers=owner,
+    )
+    second_page = response.json()
+    assert [project["name"] for project in second_page["items"]] == ["Project B"]
+    assert second_page["total"] == 2
 
 
 async def test_project_idor_is_hidden_from_other_workspace(client: AsyncClient) -> None:

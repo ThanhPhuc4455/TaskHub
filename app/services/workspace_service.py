@@ -81,15 +81,21 @@ class WorkspaceService:
         await self._workspaces.commit()
         return workspace
 
-    async def list_for_user(self, user: User, pagination: Pagination) -> list[Workspace]:
+    async def list_for_user(
+        self, user: User, pagination: Pagination
+    ) -> tuple[list[Workspace], int]:
         if user.role == UserRole.ADMIN:
-            return await self._workspaces.get_all(offset=pagination.offset, limit=pagination.limit)
+            return await self._workspaces.get_page(
+                offset=pagination.offset, limit=pagination.limit
+            )
         return await self._workspaces.get_for_user(
             user.id, offset=pagination.offset, limit=pagination.limit
         )
 
-    async def list_all(self, pagination: Pagination) -> list[Workspace]:
-        return await self._workspaces.get_all(offset=pagination.offset, limit=pagination.limit)
+    async def list_all(self, pagination: Pagination) -> tuple[list[Workspace], int]:
+        return await self._workspaces.get_page(
+            offset=pagination.offset, limit=pagination.limit
+        )
 
     async def get(self, workspace: Workspace) -> Workspace:
         return workspace
