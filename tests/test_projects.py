@@ -161,6 +161,16 @@ async def test_project_idor_is_hidden_from_other_workspace(client: AsyncClient) 
     ).status_code == 404
 
 
+async def test_project_list_hides_workspace_from_outsider(client: AsyncClient) -> None:
+    owner = await login_as(client, "list-owner@example.com")
+    outsider = await login_as(client, "list-outsider@example.com")
+    workspace_id = await create_workspace(client, owner)
+
+    response = await client.get(f"{WS}/{workspace_id}/projects", headers=outsider)
+
+    assert response.status_code == 404
+
+
 async def test_admin_can_access_project_in_another_workspace(client: AsyncClient) -> None:
     owner = await login_as(client, "project-owner@example.com")
     workspace_id = await create_workspace(client, owner)
