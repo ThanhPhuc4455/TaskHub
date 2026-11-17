@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.label import Label
@@ -9,7 +9,15 @@ class LabelRepository(BaseRepository[Label]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, Label)
 
-    async def list_by_project(self, project_id: int, *, offset: int, limit: int) -> list[Label]:
+    async def list_by_project(
+        self, project_id: int, *, offset: int, limit: int
+    ) -> tuple[list[Label], int]:
+        total = int(
+            await self.session.scalar(
+                select(func.count()).select_from(Label).where(Label.project_id == project_id)
+            )
+            or 0
+        )
         result = await self.session.scalars(
             select(Label)
             .where(Label.project_id == project_id)
@@ -17,4 +25,4 @@ class LabelRepository(BaseRepository[Label]):
             .offset(offset)
             .limit(limit)
         )
-        return list(result.all())
+        return list(result.all()), total

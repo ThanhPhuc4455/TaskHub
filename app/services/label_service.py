@@ -48,7 +48,7 @@ class LabelService:
 
     async def list_labels(
         self, access: ProjectAccessContext, pagination: Pagination
-    ) -> list[Label]:
+    ) -> tuple[list[Label], int]:
         return await self._labels.list_by_project(
             access.project.id, offset=pagination.offset, limit=pagination.limit
         )

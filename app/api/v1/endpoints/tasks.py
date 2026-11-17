@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Query, status
 
@@ -13,7 +13,8 @@ from app.api.responses import RBAC_RESPONSES
 from app.models.enums import TaskPriority, TaskStatus, WorkspaceMemberRole
 from app.models.task import Task
 from app.repositories.task_repository import TaskFilters
-from app.schemas.task import TaskCreate, TaskPageResponse, TaskRead, TaskUpdate
+from app.schemas.page import PageResponse
+from app.schemas.task import TaskCreate, TaskRead, TaskUpdate
 from app.services.project_service import ProjectAccessContext
 from app.services.task_service import TaskAccessContext
 
@@ -51,7 +52,7 @@ async def create_task(
     return await service.create(access, current_user, payload)
 
 
-@router.get("/projects/{project_id}/tasks", response_model=TaskPageResponse)
+@router.get("/projects/{project_id}/tasks", response_model=PageResponse[TaskRead])
 async def list_tasks(
     access: ProjectViewer,
     service: TaskServiceDep,
@@ -59,14 +60,14 @@ async def list_tasks(
     status_filter: Annotated[TaskStatus | None, Query(alias="status")] = None,
     priority: TaskPriority | None = None,
     assignee_id: Annotated[int | None, Query(ge=1)] = None,
-) -> TaskPageResponse:
+) -> PageResponse[TaskRead]:
     result = await service.list_tasks(
         access,
         TaskFilters(status=status_filter, priority=priority, assignee_id=assignee_id),
         pagination,
     )
-    return TaskPageResponse(
-        items=result.items, total=result.total, page=pagination.page, limit=pagination.limit
+    return PageResponse.from_result(
+        cast(list[TaskRead], result.items), result.total, pagination.page, pagination.limit
     )
 
 

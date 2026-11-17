@@ -22,10 +22,3 @@ class CommentRead(BaseSchema):
     author: UserSummary | None
     content: str
     created_at: datetime
-
-
-class CommentPageResponse(BaseSchema):
-    items: list[CommentRead]
-    total: int
-    page: int
-    limit: int

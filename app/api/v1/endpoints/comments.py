@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, status
 
@@ -12,7 +12,8 @@ from app.api.deps import (
 from app.api.responses import RBAC_RESPONSES
 from app.models.comment import Comment
 from app.models.enums import WorkspaceMemberRole
-from app.schemas.comment import CommentCreate, CommentPageResponse, CommentRead
+from app.schemas.comment import CommentCreate, CommentRead
+from app.schemas.page import PageResponse
 from app.services.comment_service import CommentAccessContext
 from app.services.task_service import TaskAccessContext
 
@@ -46,13 +47,13 @@ async def create_comment(
     return await service.create(task, current_user, payload)
 
 
-@router.get("/tasks/{task_id}/comments", response_model=CommentPageResponse)
+@router.get("/tasks/{task_id}/comments", response_model=PageResponse[CommentRead])
 async def list_comments(
     task: TaskViewer, service: CommentServiceDep, pagination: PaginationDep
-) -> CommentPageResponse:
+) -> PageResponse[CommentRead]:
     comments, total = await service.list_comments(task, pagination)
-    return CommentPageResponse(
-        items=comments, total=total, page=pagination.page, limit=pagination.limit
+    return PageResponse.from_result(
+        cast(list[CommentRead], comments), total, pagination.page, pagination.limit
     )
 
 

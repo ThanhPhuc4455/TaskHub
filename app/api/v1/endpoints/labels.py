@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, status
 
@@ -12,6 +12,7 @@ from app.api.responses import RBAC_RESPONSES
 from app.models.enums import WorkspaceMemberRole
 from app.models.label import Label
 from app.schemas.label import LabelCreate, LabelRead, LabelUpdate
+from app.schemas.page import PageResponse
 from app.services.label_service import LabelAccessContext
 from app.services.project_service import ProjectAccessContext
 from app.services.task_service import TaskAccessContext
@@ -47,11 +48,14 @@ async def create_label(
     return await service.create(access, payload)
 
 
-@router.get("/projects/{project_id}/labels", response_model=list[LabelRead])
+@router.get("/projects/{project_id}/labels", response_model=PageResponse[LabelRead])
 async def list_labels(
     access: ProjectViewer, service: LabelServiceDep, pagination: PaginationDep
-) -> list[Label]:
-    return await service.list_labels(access, pagination)
+) -> PageResponse[LabelRead]:
+    items, total = await service.list_labels(access, pagination)
+    return PageResponse.from_result(
+        cast(list[LabelRead], items), total, pagination.page, pagination.limit
+    )
 
 
 @router.patch("/labels/{label_id}", response_model=LabelRead)

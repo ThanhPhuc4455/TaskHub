@@ -4,7 +4,7 @@ from pydantic import ConfigDict, Field
 
 from app.core.constants import TASK_TITLE_MAX_LENGTH, TASK_TITLE_MIN_LENGTH
 from app.models.enums import TaskPriority, TaskStatus
-from app.schemas.base import BasePatchSchema, BaseSchema, PageResponse
+from app.schemas.base import BasePatchSchema, BaseSchema
 from app.schemas.label import LabelRead
 from app.schemas.user import UserSummary
 
@@ -45,7 +45,3 @@ class TaskRead(BaseSchema):
     created_at: datetime
     updated_at: datetime
     labels: list[LabelRead]
-
-
-class TaskPageResponse(PageResponse[TaskRead]):
-    pass
