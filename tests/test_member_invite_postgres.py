@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.exceptions import ConflictError
@@ -54,6 +55,7 @@ async def invite_once(
 @pytest.mark.asyncio
 async def test_concurrent_invites_return_one_created_and_one_conflict(
     postgres_sessionmaker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     email = f"invitee-{uuid4().hex}@example.com"
     async with postgres_sessionmaker() as session:
@@ -82,6 +84,21 @@ async def test_concurrent_invites_return_one_created_and_one_conflict(
         await session.commit()
         workspace_id = workspace.id
 
+    barrier = asyncio.Barrier(2)
+    original_get_membership = WorkspaceMemberRepository.get_membership
+
+    async def synchronized_get_membership(
+        repository: WorkspaceMemberRepository, workspace_id: int, user_id: int
+    ) -> WorkspaceMember | None:
+        await barrier.wait()
+        return await original_get_membership(repository, workspace_id, user_id)
+
+    monkeypatch.setattr(
+        WorkspaceMemberRepository,
+        "get_membership",
+        synchronized_get_membership,
+    )
+
     results = await asyncio.gather(
         invite_once(postgres_sessionmaker, workspace_id, email),
         invite_once(postgres_sessionmaker, workspace_id, email),
@@ -99,3 +116,54 @@ async def test_concurrent_invites_return_one_created_and_one_conflict(
             ).all()
         )
         assert len(memberships) == 2
+
+
+@pytest.mark.asyncio
+async def test_invite_foreign_key_error_is_not_reported_as_conflict(
+    postgres_sessionmaker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async with postgres_sessionmaker() as session:
+        owner = User(
+            email=f"owner-fk-{uuid4().hex}@example.com",
+            full_name="Owner",
+            hashed_password=await hash_password("password123"),
+        )
+        session.add(owner)
+        await session.flush()
+        workspace = Workspace(name=f"Workspace-fk-{uuid4().hex}", owner_id=owner.id)
+        session.add(workspace)
+        await session.flush()
+        session.add(
+            WorkspaceMember(
+                workspace_id=workspace.id,
+                user_id=owner.id,
+                role=WorkspaceMemberRole.OWNER,
+            )
+        )
+        await session.commit()
+
+        missing_user = User(
+            id=999_999_999,
+            email="missing@example.com",
+            full_name="Missing",
+            hashed_password="not-used",
+        )
+
+        async def return_missing_user(_: UserRepository, __: str) -> User:
+            return missing_user
+
+        monkeypatch.setattr(UserRepository, "get_by_email", return_missing_user)
+        service = MemberService(
+            WorkspaceService(WorkspaceRepository(session), WorkspaceMemberRepository(session)),
+            WorkspaceMemberRepository(session),
+            UserRepository(session),
+        )
+
+        with pytest.raises(IntegrityError) as error:
+            await service.invite(
+                workspace.id,
+                InviteMemberRequest(email="missing@example.com"),
+            )
+
+        assert getattr(error.value.orig, "sqlstate", None) == "23503"
