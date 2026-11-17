@@ -1,20 +1,21 @@
 from dataclasses import dataclass
 
-from app.core.constants import PROJECT_ARCHIVED_MESSAGE
 from app.core.exceptions import BadRequestError, NotFoundError
+from app.core.messages import PROJECT_ARCHIVED_MESSAGE
 from app.core.pagination import Pagination
 from app.models.enums import ProjectStatus, WorkspaceMemberRole
 from app.models.project import Project
 from app.models.user import User
+from app.models.workspace import Workspace
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectUpdate
-from app.services.workspace_service import WorkspaceAccessContext, WorkspaceService
+from app.services.workspace_service import WorkspaceService
 
 
 @dataclass(frozen=True)
 class ProjectAccessContext:
     project: Project
-    workspace: WorkspaceAccessContext
+    workspace: Workspace
 
 
 class ProjectService:
@@ -22,18 +23,18 @@ class ProjectService:
         self._projects = projects
         self._workspaces = workspaces
 
-    async def create(self, access: WorkspaceAccessContext, payload: ProjectCreate) -> Project:
+    async def create(self, access: Workspace, payload: ProjectCreate) -> Project:
         return await self._projects.create(
-            workspace_id=access.workspace_id,
+            workspace_id=access.id,
             name=payload.name,
             description=payload.description,
         )
 
     async def list_for_workspace(
-        self, access: WorkspaceAccessContext, pagination: Pagination
-    ) -> list[Project]:
+        self, access: Workspace, pagination: Pagination
+    ) -> tuple[list[Project], int]:
         return await self._projects.list_by_workspace(
-            access.workspace_id, offset=pagination.offset, limit=pagination.limit
+            access.id, offset=pagination.offset, limit=pagination.limit
         )
 
     async def require_project_role(

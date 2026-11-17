@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
+from app.core.messages import CANNOT_ASSIGN_OWNER_MESSAGE, CANNOT_INVITE_OWNER_MESSAGE
 from app.models.workspace_member import WorkspaceMemberRole
 from app.schemas.base import BaseSchema
 
@@ -12,7 +13,7 @@ class InviteMemberRequest(BaseSchema):
     @classmethod
     def cannot_invite_owner(cls, value: WorkspaceMemberRole) -> WorkspaceMemberRole:
         if value == WorkspaceMemberRole.OWNER:
-            raise ValueError("cannot invite a member as OWNER")
+            raise ValueError(CANNOT_INVITE_OWNER_MESSAGE)
         return value
 
 
@@ -23,7 +24,7 @@ class UpdateMemberRoleRequest(BaseSchema):
     @classmethod
     def cannot_assign_owner(cls, value: WorkspaceMemberRole) -> WorkspaceMemberRole:
         if value == WorkspaceMemberRole.OWNER:
-            raise ValueError("cannot assign OWNER role")
+            raise ValueError(CANNOT_ASSIGN_OWNER_MESSAGE)
         return value
 
 

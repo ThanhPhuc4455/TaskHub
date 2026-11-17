@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Annotated, Any
 
 from fastapi import Depends, Query
@@ -6,13 +6,15 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.constants import FORBIDDEN_MESSAGE, INVALID_TOKEN_MESSAGE
+from app.core.constants import DEFAULT_PAGE, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from app.core.database import get_db_session
-from app.core.exceptions import AuthenticationError, ForbiddenError, NotFoundError
+from app.core.exceptions import ForbiddenError, NotFoundError
+from app.core.messages import FORBIDDEN_MESSAGE
 from app.core.pagination import Pagination
 from app.core.security import TokenType, decode_token
 from app.models.enums import WorkspaceMemberRole
 from app.models.user import User, UserRole
+from app.models.workspace import Workspace
 from app.repositories.comment_repository import CommentRepository
 from app.repositories.label_repository import LabelRepository
 from app.repositories.project_repository import ProjectRepository
@@ -27,12 +29,9 @@ from app.services.label_service import LabelAccessContext, LabelService
 from app.services.member_service import MemberService
 from app.services.project_service import ProjectAccessContext, ProjectService
 from app.services.task_service import TaskAccessContext, TaskService
+from app.services.user_context import resolve_user
 from app.services.user_service import UserService
-from app.services.workspace_service import (
-    WorkspaceAccessContext,
-    WorkspaceService,
-    authorize_resource,
-)
+from app.services.workspace_service import WorkspaceService
 
 
 def get_workspace_repository(
@@ -42,8 +41,8 @@ def get_workspace_repository(
 
 
 def get_pagination(
-    page: int = Query(1, ge=1),
-    limit: int = Query(100, ge=1, le=100),
+    page: Annotated[int, Query(ge=1)] = DEFAULT_PAGE,
+    limit: Annotated[int, Query(ge=1, le=MAX_PAGE_SIZE)] = DEFAULT_PAGE_SIZE,
 ) -> Pagination:
     return Pagination(page=page, limit=limit)
 
@@ -133,10 +132,13 @@ def get_user_repository(
     return UserRepository(session)
 
 
+UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
+
+
 def get_member_service(
-    workspaces: Annotated[WorkspaceService, Depends(get_workspace_service)],
+    workspaces: WorkspaceServiceDep,
     members: Annotated[WorkspaceMemberRepository, Depends(get_workspace_member_repository)],
-    users: Annotated[UserRepository, Depends(get_user_repository)],
+    users: UserRepositoryDep,
 ) -> MemberService:
     return MemberService(workspaces, members, users)
 
@@ -151,31 +153,25 @@ def get_refresh_token_repository(
 
 
 def get_auth_service(
-    users: Annotated[UserRepository, Depends(get_user_repository)],
+    users: UserRepositoryDep,
     tokens: Annotated[RefreshTokenRepository, Depends(get_refresh_token_repository)],
 ) -> AuthService:
     return AuthService(users, tokens)
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
-
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/login")
 
 
 async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
-    users: Annotated[UserRepository, Depends(get_user_repository)],
+    token: Annotated[str, Depends(oauth2_scheme)], users: UserRepositoryDep
 ) -> User:
     payload = decode_token(token, TokenType.ACCESS)
-    user = await users.get(payload.user_id)
-    if user is None or not user.is_active:
-        raise AuthenticationError(INVALID_TOKEN_MESSAGE)
-    return user
+    return await resolve_user(payload.user_id, users)
 
 
 def get_user_service(
-    users: Annotated[UserRepository, Depends(get_user_repository)],
+    users: UserRepositoryDep,
     tokens: Annotated[RefreshTokenRepository, Depends(get_refresh_token_repository)],
 ) -> UserService:
     return UserService(users, tokens)
@@ -194,35 +190,24 @@ def require_admin(current_user: CurrentUser) -> User:
 AdminUser = Annotated[User, Depends(require_admin)]
 
 
-def require_workspace_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
+def require_workspace_role(required: WorkspaceMemberRole) -> Callable[..., Awaitable[Workspace]]:
     async def dependency(
-        workspace_id: int,
-        service: WorkspaceServiceDep,
-        current_user: CurrentUser,
-    ) -> WorkspaceAccessContext:
-        return await service.authorize(workspace_id, current_user, required)
+        workspace_id: int, current_user: CurrentUser, service: WorkspaceServiceDep
+    ) -> Workspace:
+        return await service.require_role(workspace_id, current_user, required)
 
     return dependency
 
 
+WorkspaceViewer = Annotated[Workspace, Depends(require_workspace_role(WorkspaceMemberRole.VIEWER))]
+WorkspaceOwner = Annotated[Workspace, Depends(require_workspace_role(WorkspaceMemberRole.OWNER))]
+
+
 def require_project_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
     async def dependency(
-        project_id: int,
-        projects: Annotated[ProjectRepository, Depends(get_project_repository)],
-        workspaces: WorkspaceServiceDep,
-        current_user: CurrentUser,
+        project_id: int, projects: ProjectServiceDep, current_user: CurrentUser
     ) -> ProjectAccessContext:
-        project = await projects.get(project_id)
-        project, workspace = await authorize_resource(
-            project,
-            "Project",
-            project.workspace_id if project is not None else project_id,
-            current_user,
-            required,
-            workspaces,
-        )
-        assert project is not None
-        return ProjectAccessContext(project=project, workspace=workspace)
+        return await projects.require_project_role(project_id, current_user, required)
 
     return dependency
 
@@ -231,24 +216,24 @@ def require_task_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
     async def dependency(
         task_id: int,
         tasks: Annotated[TaskRepository, Depends(get_task_repository)],
-        projects: Annotated[ProjectRepository, Depends(get_project_repository)],
-        workspaces: WorkspaceServiceDep,
+        projects: ProjectServiceDep,
         current_user: CurrentUser,
+        members: Annotated[WorkspaceMemberRepository, Depends(get_workspace_member_repository)],
     ) -> TaskAccessContext:
         task = await tasks.get_with_details(task_id)
         if task is None:
             raise NotFoundError("Task", task_id)
-        project = await projects.get(task.project_id)
-        project, workspace = await authorize_resource(
-            project,
-            "Project",
-            project.workspace_id if project is not None else task.project_id,
-            current_user,
-            required,
-            workspaces,
+        access = await projects.require_project_role(task.project_id, current_user, required)
+        if current_user.role == UserRole.ADMIN:
+            role = WorkspaceMemberRole.OWNER
+        else:
+            membership = await members.get_membership(access.workspace.id, current_user.id)
+            if membership is None:
+                raise NotFoundError("Workspace", access.workspace.id)
+            role = membership.role
+        return TaskAccessContext(
+            task=task, project=access.project, workspace=access.workspace, effective_role=role
         )
-        assert project is not None
-        return TaskAccessContext(task=task, project=project, workspace=workspace)
 
     return dependency
 
@@ -257,24 +242,24 @@ def require_label_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
     async def dependency(
         label_id: int,
         labels: Annotated[LabelRepository, Depends(get_label_repository)],
-        projects: Annotated[ProjectRepository, Depends(get_project_repository)],
-        workspaces: WorkspaceServiceDep,
+        projects: ProjectServiceDep,
         current_user: CurrentUser,
+        members: Annotated[WorkspaceMemberRepository, Depends(get_workspace_member_repository)],
     ) -> LabelAccessContext:
         label = await labels.get(label_id)
         if label is None:
             raise NotFoundError("Label", label_id)
-        project = await projects.get(label.project_id)
-        project, workspace = await authorize_resource(
-            project,
-            "Project",
-            project.workspace_id if project is not None else label.project_id,
-            current_user,
-            required,
-            workspaces,
+        access = await projects.require_project_role(label.project_id, current_user, required)
+        if current_user.role == UserRole.ADMIN:
+            role = WorkspaceMemberRole.OWNER
+        else:
+            membership = await members.get_membership(access.workspace.id, current_user.id)
+            if membership is None:
+                raise NotFoundError("Workspace", access.workspace.id)
+            role = membership.role
+        return LabelAccessContext(
+            label=label, project=access.project, workspace=access.workspace, effective_role=role
         )
-        assert project is not None
-        return LabelAccessContext(label=label, project=project, workspace=workspace)
 
     return dependency
 
@@ -285,31 +270,32 @@ def require_comment_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
         comment_id: int,
         comments: Annotated[CommentRepository, Depends(get_comment_repository)],
         tasks: Annotated[TaskRepository, Depends(get_task_repository)],
-        projects: Annotated[ProjectRepository, Depends(get_project_repository)],
-        workspaces: WorkspaceServiceDep,
+        projects: ProjectServiceDep,
         current_user: CurrentUser,
+        members: Annotated[WorkspaceMemberRepository, Depends(get_workspace_member_repository)],
     ) -> CommentAccessContext:
         comment = await comments.get_with_author(comment_id)
-        if comment is None:
+        if comment is None or comment.task_id != task_id:
             raise NotFoundError("Comment", comment_id)
-        if comment.task_id != task_id:
-            raise NotFoundError("Comment", comment_id)
-        task = await tasks.get_with_details(comment.task_id)
+        task = await tasks.get_with_details(task_id)
         if task is None:
-            raise NotFoundError("Task", comment.task_id)
-        project = await projects.get(task.project_id)
-        project, workspace = await authorize_resource(
-            project,
-            "Project",
-            project.workspace_id if project is not None else task.project_id,
-            current_user,
-            required,
-            workspaces,
-        )
-        assert project is not None
+            raise NotFoundError("Task", task_id)
+        access = await projects.require_project_role(task.project_id, current_user, required)
+        if current_user.role == UserRole.ADMIN:
+            role = WorkspaceMemberRole.OWNER
+        else:
+            membership = await members.get_membership(access.workspace.id, current_user.id)
+            if membership is None:
+                raise NotFoundError("Workspace", access.workspace.id)
+            role = membership.role
         return CommentAccessContext(
             comment=comment,
-            task=TaskAccessContext(task=task, project=project, workspace=workspace),
+            task=TaskAccessContext(
+                task=task,
+                project=access.project,
+                workspace=access.workspace,
+                effective_role=role,
+            ),
         )
 
     return dependency

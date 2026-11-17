@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from app.core.constants import COMMENT_NOT_OWNER_MESSAGE, PROJECT_ARCHIVED_MESSAGE
 from app.core.exceptions import BadRequestError, ForbiddenError
+from app.core.messages import COMMENT_NOT_OWNER_MESSAGE, PROJECT_ARCHIVED_MESSAGE
 from app.core.pagination import Pagination
 from app.models.comment import Comment
 from app.models.enums import ProjectStatus, WorkspaceMemberRole
@@ -45,7 +45,7 @@ class CommentService:
 
     async def delete(self, access: CommentAccessContext, user: User) -> None:
         self._ensure_active(access.task.project)
-        is_owner = access.task.workspace.effective_role.rank >= WorkspaceMemberRole.OWNER.rank
+        is_owner = access.task.effective_role.rank >= WorkspaceMemberRole.OWNER.rank
         if access.comment.author_id != user.id and user.role != UserRole.ADMIN and not is_owner:
             raise ForbiddenError(COMMENT_NOT_OWNER_MESSAGE)
         await self._comments.delete(access.comment)

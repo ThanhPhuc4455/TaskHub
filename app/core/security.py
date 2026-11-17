@@ -8,8 +8,9 @@ import bcrypt
 import jwt
 
 from app.core.config import settings
-from app.core.constants import INVALID_TOKEN_MESSAGE, PASSWORD_MAX_BYTES, WRONG_TOKEN_TYPE_MESSAGE
+from app.core.constants import PASSWORD_MAX_BYTES
 from app.core.exceptions import AuthenticationError
+from app.core.messages import INVALID_TOKEN_MESSAGE, WRONG_TOKEN_TYPE_MESSAGE
 
 
 class TokenType(enum.StrEnum):

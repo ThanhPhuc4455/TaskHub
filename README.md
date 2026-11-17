@@ -78,8 +78,18 @@ It returns `items`, `total`, `page`, and `limit`, ordered by `created_at DESC,
 id DESC`. Invalid input returns `422`; missing resources are `404` and
 insufficient role is `403`.
 
-List endpoints accept `page` and `limit` query parameters. `page` starts at 1 and
-`limit` is between 1 and 100.
+List endpoints accept `page` and `limit` query parameters. `page` starts at 1;
+the default `limit` is 20 and the allowed range is 1–100. List responses use the
+same envelope:
+
+```json
+{
+  "items": [],
+  "total": 0,
+  "page": 1,
+  "limit": 20
+}
+```
 
 ## Migrations
 

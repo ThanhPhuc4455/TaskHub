@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from app.core.constants import NOT_FOUND_MESSAGE
+from app.core.messages import NOT_FOUND_MESSAGE
 
 
 class AppException(Exception):
@@ -18,23 +18,19 @@ class NotFoundError(AppException):
 
 class ConflictError(AppException):
     status_code = 409
-
     """Data conflicts with an existing resource."""
 
 
 class AuthenticationError(AppException):
     status_code = 401
-
     """Authentication failed or a token is invalid."""
 
 
 class BadRequestError(AppException):
     status_code = 400
-
     """The request is invalid from a business perspective."""
 
 
 class ForbiddenError(AppException):
     status_code = 403
-
     """The authenticated user lacks permission."""

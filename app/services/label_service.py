@@ -2,30 +2,31 @@ from dataclasses import dataclass
 
 from sqlalchemy.exc import IntegrityError
 
-from app.core.constants import (
+from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
+from app.core.messages import (
     LABEL_ALREADY_ATTACHED_MESSAGE,
     LABEL_ALREADY_EXISTS_MESSAGE,
     LABEL_PROJECT_MISMATCH_MESSAGE,
     PROJECT_ARCHIVED_MESSAGE,
 )
-from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.core.pagination import Pagination
-from app.models.enums import ProjectStatus
+from app.models.enums import ProjectStatus, WorkspaceMemberRole
 from app.models.label import Label
 from app.models.project import Project
+from app.models.workspace import Workspace
 from app.repositories.label_repository import LabelRepository
 from app.repositories.task_repository import TaskRepository
 from app.schemas.label import LabelCreate, LabelUpdate
 from app.services.project_service import ProjectAccessContext
 from app.services.task_service import TaskAccessContext
-from app.services.workspace_service import WorkspaceAccessContext
 
 
 @dataclass(frozen=True)
 class LabelAccessContext:
     label: Label
     project: Project
-    workspace: WorkspaceAccessContext
+    workspace: Workspace
+    effective_role: WorkspaceMemberRole
 
 
 class LabelService:

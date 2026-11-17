@@ -21,7 +21,7 @@ async def _cleanup_refresh_tokens_periodically() -> None:
     while True:
         try:
             async with AsyncSessionLocal() as session:
-                await RefreshTokenRepository(session).delete_expired_or_revoked()
+                await RefreshTokenRepository(session).delete_expired()
         except asyncio.CancelledError:
             raise
         except Exception:
