@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.core.exceptions import BadRequestError
+from app.core.exceptions import UnprocessableEntityError
 from app.core.messages import ASSIGNEE_NOT_MEMBER_MESSAGE
 from app.core.pagination import Pagination
 from app.models.enums import WorkspaceMemberRole
@@ -40,7 +40,7 @@ class TaskService:
             assignee_id is not None
             and await self._members.get_membership(workspace_id, assignee_id) is None
         ):
-            raise BadRequestError(ASSIGNEE_NOT_MEMBER_MESSAGE)
+            raise UnprocessableEntityError(ASSIGNEE_NOT_MEMBER_MESSAGE)
 
     async def create(
         self,

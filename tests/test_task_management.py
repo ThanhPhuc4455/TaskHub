@@ -79,7 +79,7 @@ async def test_task_rbac_assignee_and_archived_project(client: AsyncClient) -> N
         json={"title": "Bad assignee", "assignee_id": 999999},
         headers=owner,
     )
-    assert bad_assignee.status_code == 400
+    assert bad_assignee.status_code == 422
     assert "workspace member" in bad_assignee.json()["detail"]
 
     archived = await client.post(f"/api/v1/projects/{project_id}/archive", headers=owner)
