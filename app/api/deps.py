@@ -24,10 +24,7 @@ from app.services.member_service import MemberService
 from app.services.project_service import ProjectAccessContext, ProjectService
 from app.services.user_context import resolve_user
 from app.services.user_service import UserService
-from app.services.workspace_service import (
-    WorkspaceService,
-    authorize_resource,
-)
+from app.services.workspace_service import WorkspaceService
 
 
 def get_workspace_repository(
@@ -169,20 +166,9 @@ WorkspaceOwner = Annotated[
 def require_project_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
     async def dependency(
         project_id: int,
-        projects: Annotated[ProjectRepository, Depends(get_project_repository)],
-        workspaces: WorkspaceServiceDep,
+        projects: ProjectServiceDep,
         current_user: CurrentUser,
     ) -> ProjectAccessContext:
-        project = await projects.get(project_id)
-        project, workspace = await authorize_resource(
-            project,
-            "Project",
-            project.workspace_id if project is not None else project_id,
-            current_user,
-            required,
-            workspaces,
-        )
-        assert project is not None
-        return ProjectAccessContext(project=project, workspace=workspace)
+        return await projects.require_project_role(project_id, current_user, required)
 
     return dependency
