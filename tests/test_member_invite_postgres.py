@@ -85,12 +85,15 @@ async def test_concurrent_invites_return_one_created_and_one_conflict(
         workspace_id = workspace.id
 
     barrier = asyncio.Barrier(2)
+    membership_checks = 0
     original_get_membership = WorkspaceMemberRepository.get_membership
 
     async def synchronized_get_membership(
         repository: WorkspaceMemberRepository, workspace_id: int, user_id: int
     ) -> WorkspaceMember | None:
+        nonlocal membership_checks
         await barrier.wait()
+        membership_checks += 1
         return await original_get_membership(repository, workspace_id, user_id)
 
     monkeypatch.setattr(
@@ -104,6 +107,7 @@ async def test_concurrent_invites_return_one_created_and_one_conflict(
         invite_once(postgres_sessionmaker, workspace_id, email),
     )
     assert sorted(results) == ["201", "409"]
+    assert membership_checks == 2
 
     async with postgres_sessionmaker() as session:
         memberships = list(
