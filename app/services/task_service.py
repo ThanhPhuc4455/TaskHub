@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from app.core.exceptions import UnprocessableEntityError
 from app.core.messages import ASSIGNEE_NOT_MEMBER_MESSAGE
 from app.core.pagination import Pagination
-from app.models.enums import WorkspaceMemberRole
+from app.models.enums import TaskStatus, WorkspaceMemberRole
 from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
@@ -55,7 +55,7 @@ class TaskService:
             assignee_id=payload.assignee_id,
             title=payload.title,
             description=payload.description,
-            status=payload.status,
+            status=TaskStatus.TODO,
             priority=payload.priority,
             due_date=payload.due_date,
             created_by=user.id,

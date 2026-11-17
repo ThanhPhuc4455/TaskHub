@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 from httpx import AsyncClient
 
 from tests.helpers import login_as
@@ -27,7 +29,7 @@ async def test_task_crud_filters_and_pagination(client: AsyncClient) -> None:
     )
     second = await client.post(
         f"/api/v1/projects/{project_id}/tasks",
-        json={"title": "Second", "status": "DONE"},
+        json={"title": "Second"},
         headers=owner,
     )
     assert first.status_code == 201
@@ -70,6 +72,34 @@ async def test_task_crud_filters_and_pagination(client: AsyncClient) -> None:
     )
     assert updated.status_code == 200
     assert updated.json()["status"] == "IN_PROGRESS"
+
+
+async def test_task_create_validation(client: AsyncClient) -> None:
+    owner = await login_as(client, "task-validation@example.com")
+    project_id = await project_for(client, owner, "Validation workspace")
+
+    for payload in (
+        {"title": "Naive", "due_date": "2099-01-01T00:00:00"},
+        {"title": "Past", "due_date": "2000-01-01T00:00:00Z"},
+        {"title": "Bad assignee", "assignee_id": 0},
+        {"title": "Negative assignee", "assignee_id": -1},
+        {"title": "Client status", "status": "DONE"},
+    ):
+        response = await client.post(
+            f"/api/v1/projects/{project_id}/tasks", json=payload, headers=owner
+        )
+        assert response.status_code == 422
+
+    future = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={
+            "title": "Future",
+            "due_date": (datetime.now(UTC) + timedelta(days=1)).isoformat(),
+        },
+        headers=owner,
+    )
+    assert future.status_code == 201
+    assert future.json()["status"] == "TODO"
 
 
 async def test_task_rbac_assignee_and_archived_project(client: AsyncClient) -> None:

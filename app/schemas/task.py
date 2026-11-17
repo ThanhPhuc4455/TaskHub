@@ -1,21 +1,23 @@
 from datetime import datetime
 
-from pydantic import ConfigDict, Field
+from pydantic import ConfigDict, Field, PositiveInt
 
 from app.core.constants import TASK_TITLE_MAX_LENGTH, TASK_TITLE_MIN_LENGTH
 from app.models.enums import TaskPriority, TaskStatus
 from app.schemas.base import BasePatchSchema, BaseSchema
 from app.schemas.label import LabelRead
+from app.schemas.types import FutureDatetime
 from app.schemas.user import UserSummary
 
 
 class TaskCreate(BaseSchema):
+    model_config = ConfigDict(extra="forbid")
+
     title: str = Field(min_length=TASK_TITLE_MIN_LENGTH, max_length=TASK_TITLE_MAX_LENGTH)
     description: str | None = None
-    status: TaskStatus = TaskStatus.TODO
     priority: TaskPriority = TaskPriority.MEDIUM
-    assignee_id: int | None = None
-    due_date: datetime | None = None
+    assignee_id: PositiveInt | None = None
+    due_date: FutureDatetime | None = None
 
 
 class TaskUpdate(BasePatchSchema):
@@ -25,8 +27,8 @@ class TaskUpdate(BasePatchSchema):
     description: str | None = None
     status: TaskStatus | None = None
     priority: TaskPriority | None = None
-    assignee_id: int | None = None
-    due_date: datetime | None = None
+    assignee_id: PositiveInt | None = None
+    due_date: FutureDatetime | None = None
 
 
 class TaskRead(BaseSchema):
