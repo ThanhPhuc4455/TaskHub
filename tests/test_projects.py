@@ -1,5 +1,8 @@
 from httpx import AsyncClient
+from sqlalchemy import select
 
+from app.main import app as fastapi_app
+from app.models.user import User, UserRole
 from tests.helpers import login_as
 
 WS = "/api/v1/workspaces"
@@ -24,6 +27,14 @@ async def invite(
         headers=headers,
     )
     assert response.status_code == 201
+
+
+async def promote_to_admin(email: str) -> None:
+    async with fastapi_app.state.test_sessionmaker() as session:
+        user = await session.scalar(select(User).where(User.email == email))
+        assert user is not None
+        user.role = UserRole.ADMIN
+        await session.commit()
 
 
 async def test_project_endpoints_require_auth(client: AsyncClient) -> None:
@@ -148,3 +159,23 @@ async def test_project_idor_is_hidden_from_other_workspace(client: AsyncClient) 
             headers=owner_b,
         )
     ).status_code == 404
+
+
+async def test_admin_can_access_project_in_another_workspace(client: AsyncClient) -> None:
+    owner = await login_as(client, "project-owner@example.com")
+    workspace_id = await create_workspace(client, owner)
+    created = await client.post(
+        f"{WS}/{workspace_id}/projects",
+        json={"name": "Admin-visible project"},
+        headers=owner,
+    )
+    assert created.status_code == 201
+    project_id = created.json()["id"]
+
+    await login_as(client, "project-admin@example.com")
+    await promote_to_admin("project-admin@example.com")
+    admin = await login_as(client, "project-admin@example.com")
+
+    response = await client.get(f"/api/v1/projects/{project_id}", headers=admin)
+    assert response.status_code == 200
+    assert response.json()["id"] == project_id
