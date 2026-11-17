@@ -19,12 +19,15 @@ from app.models.workspace_member import WorkspaceMember, WorkspaceMemberRole
 REVIEW9_MIGRATION_DATABASE_URL = os.getenv("REVIEW9_MIGRATION_DATABASE_URL")
 
 
-def run_alembic(database_url: str, revision: str) -> None:
+def run_alembic(database_url: str, revision: str, *, downgrade: bool = False) -> None:
     previous_url = settings.database_url
     settings.database_url = database_url
     try:
         config = Config(str(Path(__file__).parents[1] / "alembic.ini"))
-        command.upgrade(config, revision)
+        if downgrade:
+            command.downgrade(config, revision)
+        else:
+            command.upgrade(config, revision)
     finally:
         settings.database_url = previous_url
 
@@ -33,13 +36,17 @@ async def migrate(database_url: str, revision: str) -> None:
     await asyncio.to_thread(run_alembic, database_url, revision)
 
 
+async def reset_to_revision(database_url: str, revision: str) -> None:
+    await asyncio.to_thread(run_alembic, database_url, revision, downgrade=True)
+
+
 @pytest_asyncio.fixture
 async def postgres_sessionmaker() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     if not REVIEW9_MIGRATION_DATABASE_URL:
         pytest.skip(
             "REVIEW9_MIGRATION_DATABASE_URL is required for PostgreSQL migration tests"
         )
-    await migrate(REVIEW9_MIGRATION_DATABASE_URL, "base")
+    await reset_to_revision(REVIEW9_MIGRATION_DATABASE_URL, "base")
     await migrate(REVIEW9_MIGRATION_DATABASE_URL, "5b266bf6275e")
     engine = create_async_engine(REVIEW9_MIGRATION_DATABASE_URL, pool_pre_ping=True)
     yield async_sessionmaker(engine, expire_on_commit=False)
