@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status
 
-from app.api.deps import CurrentUser, WorkspaceServiceDep
+from app.api.deps import CurrentUser, WorkspaceOwner, WorkspaceServiceDep, WorkspaceViewer
 from app.models.workspace import Workspace
 from app.schemas.workspace import WorkspaceCreate, WorkspaceRead, WorkspaceUpdate
 
@@ -23,9 +23,9 @@ async def list_workspaces(
 
 @router.get("/{workspace_id}", response_model=WorkspaceRead)
 async def get_workspace(
-    workspace_id: int, service: WorkspaceServiceDep, current_user: CurrentUser
+    workspace: WorkspaceViewer, service: WorkspaceServiceDep
 ) -> Workspace:
-    return await service.get(workspace_id, current_user)
+    return await service.get(workspace)
 
 
 @router.patch("/{workspace_id}", response_model=WorkspaceRead)
@@ -33,13 +33,13 @@ async def update_workspace(
     workspace_id: int,
     payload: WorkspaceUpdate,
     service: WorkspaceServiceDep,
-    current_user: CurrentUser,
+    workspace: WorkspaceOwner,
 ) -> Workspace:
-    return await service.update(workspace_id, current_user, payload)
+    return await service.update(workspace, payload)
 
 
 @router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_workspace(
-    workspace_id: int, service: WorkspaceServiceDep, current_user: CurrentUser
+    service: WorkspaceServiceDep, workspace: WorkspaceOwner
 ) -> None:
-    await service.delete(workspace_id, current_user)
+    await service.delete(workspace)

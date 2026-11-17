@@ -46,14 +46,12 @@ class WorkspaceService:
             return await self._workspaces.get_all()
         return await self._workspaces.get_for_user(user.id)
 
-    async def get(self, workspace_id: int, user: User) -> Workspace:
-        return await self.require_role(workspace_id, user, WorkspaceMemberRole.VIEWER)
+    async def get(self, workspace: Workspace) -> Workspace:
+        return workspace
 
-    async def update(self, workspace_id: int, user: User, payload: WorkspaceUpdate) -> Workspace:
-        workspace = await self.require_role(workspace_id, user, WorkspaceMemberRole.OWNER)
+    async def update(self, workspace: Workspace, payload: WorkspaceUpdate) -> Workspace:
         data = payload.model_dump(exclude_unset=True)
         return await self._workspaces.update(workspace, data)
 
-    async def delete(self, workspace_id: int, user: User) -> None:
-        workspace = await self.require_role(workspace_id, user, WorkspaceMemberRole.OWNER)
+    async def delete(self, workspace: Workspace) -> None:
         await self._workspaces.delete(workspace)

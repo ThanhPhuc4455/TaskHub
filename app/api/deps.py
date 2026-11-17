@@ -8,6 +8,8 @@ from app.core.config import settings
 from app.core.database import get_db_session
 from app.core.security import TokenType, decode_token
 from app.models.user import User
+from app.models.workspace import Workspace
+from app.models.workspace_member import WorkspaceMemberRole
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
 from app.repositories.workspace_member_repository import WorkspaceMemberRepository
@@ -95,3 +97,24 @@ def get_user_service(
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 UserServiceDep = Annotated[UserService, Depends(get_user_service)]
+
+
+def require_workspace_role(required: WorkspaceMemberRole):
+    async def dependency(
+        workspace_id: int,
+        current_user: CurrentUser,
+        service: WorkspaceServiceDep,
+    ) -> Workspace:
+        return await service.require_role(workspace_id, current_user, required)
+
+    return dependency
+
+
+WorkspaceViewer = Annotated[
+    Workspace,
+    Depends(require_workspace_role(WorkspaceMemberRole.VIEWER)),
+]
+WorkspaceOwner = Annotated[
+    Workspace,
+    Depends(require_workspace_role(WorkspaceMemberRole.OWNER)),
+]
