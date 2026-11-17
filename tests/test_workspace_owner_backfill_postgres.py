@@ -6,11 +6,11 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
-from alembic import command
 from alembic.config import Config
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from alembic import command
 from app.core.config import settings
 from app.models.user import User
 from app.models.workspace import Workspace
@@ -43,9 +43,7 @@ async def reset_to_revision(database_url: str, revision: str) -> None:
 @pytest_asyncio.fixture
 async def postgres_sessionmaker() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
     if not REVIEW9_MIGRATION_DATABASE_URL:
-        pytest.skip(
-            "REVIEW9_MIGRATION_DATABASE_URL is required for PostgreSQL migration tests"
-        )
+        pytest.skip("REVIEW9_MIGRATION_DATABASE_URL is required for PostgreSQL migration tests")
     await reset_to_revision(REVIEW9_MIGRATION_DATABASE_URL, "base")
     await migrate(REVIEW9_MIGRATION_DATABASE_URL, "5b266bf6275e")
     engine = create_async_engine(REVIEW9_MIGRATION_DATABASE_URL, pool_pre_ping=True)
