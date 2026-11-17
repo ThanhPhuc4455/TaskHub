@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 
 from app.core.exceptions import BadRequestError
-from app.core.messages import ASSIGNEE_NOT_MEMBER_MESSAGE, PROJECT_ARCHIVED_MESSAGE
+from app.core.messages import ASSIGNEE_NOT_MEMBER_MESSAGE
 from app.core.pagination import Pagination
-from app.models.enums import ProjectStatus, WorkspaceMemberRole
+from app.models.enums import WorkspaceMemberRole
 from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
@@ -12,6 +12,7 @@ from app.repositories.project_repository import ProjectRepository
 from app.repositories.task_repository import TaskFilters, TaskPage, TaskRepository
 from app.repositories.workspace_member_repository import WorkspaceMemberRepository
 from app.schemas.task import TaskCreate, TaskUpdate
+from app.services.project_policy import ensure_project_active
 from app.services.project_service import ProjectAccessContext
 
 
@@ -41,18 +42,13 @@ class TaskService:
         ):
             raise BadRequestError(ASSIGNEE_NOT_MEMBER_MESSAGE)
 
-    @staticmethod
-    def _ensure_active(project: Project) -> None:
-        if project.status == ProjectStatus.ARCHIVED:
-            raise BadRequestError(PROJECT_ARCHIVED_MESSAGE)
-
     async def create(
         self,
         access: ProjectAccessContext,
         user: User,
         payload: TaskCreate,
     ) -> Task:
-        self._ensure_active(access.project)
+        ensure_project_active(access.project)
         await self._check_assignee(access.workspace.id, payload.assignee_id)
         task = await self._tasks.create(
             project_id=access.project.id,
@@ -83,12 +79,12 @@ class TaskService:
         return access.task
 
     async def update(self, access: TaskAccessContext, payload: TaskUpdate) -> Task:
-        self._ensure_active(access.project)
+        ensure_project_active(access.project)
         data = payload.model_dump(exclude_unset=True)
         if "assignee_id" in data:
             await self._check_assignee(access.workspace.id, data["assignee_id"])
         return await self._tasks.update(access.task, data)
 
     async def delete(self, access: TaskAccessContext) -> None:
-        self._ensure_active(access.project)
+        ensure_project_active(access.project)
         await self._tasks.delete(access.task)
