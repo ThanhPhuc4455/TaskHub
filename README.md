@@ -61,8 +61,18 @@ An ADMIN can verify access through `GET /api/v1/admin/workspaces`.
 - Projects: `/api/v1/workspaces/{workspace_id}/projects` and `/api/v1/projects/{project_id}`
 - ADMIN: `/api/v1/admin/workspaces`
 
-List endpoints accept `page` and `limit` query parameters. `page` starts at 1 and
-`limit` is between 1 and 100.
+List endpoints accept `page` and `limit` query parameters. `page` starts at 1;
+the default `limit` is 20 and the allowed range is 1–100. List responses use the
+same envelope:
+
+```json
+{
+  "items": [],
+  "total": 0,
+  "page": 1,
+  "limit": 20
+}
+```
 
 ## Migrations
 
