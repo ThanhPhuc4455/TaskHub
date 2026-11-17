@@ -9,13 +9,13 @@ from app.models.user import User
 from app.models.workspace import Workspace
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectUpdate
-from app.services.workspace_service import WorkspaceAccessContext, WorkspaceService
+from app.services.workspace_service import WorkspaceService
 
 
 @dataclass(frozen=True)
 class ProjectAccessContext:
     project: Project
-    workspace: WorkspaceAccessContext
+    workspace: Workspace
 
 
 class ProjectService:
