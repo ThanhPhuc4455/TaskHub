@@ -1,6 +1,7 @@
+from sqlalchemy.exc import IntegrityError
+
 from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.core.messages import ALREADY_MEMBER_MESSAGE, CANNOT_REMOVE_OWNER_MESSAGE
-from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.workspace_member import WorkspaceMember
 from app.repositories.user_repository import UserRepository
@@ -23,17 +24,21 @@ class MemberService:
     async def list_members(self, workspace_id: int) -> list[WorkspaceMember]:
         return await self._members.list_by_workspace(workspace_id)
 
-    async def invite(
-        self, workspace_id: int, payload: InviteMemberRequest
-    ) -> WorkspaceMember:
+    async def invite(self, workspace_id: int, payload: InviteMemberRequest) -> WorkspaceMember:
         invitee = await self._users.get_by_email(payload.email.lower())
         if invitee is None:
             raise NotFoundError("User", payload.email)
         if await self._members.get_membership(workspace_id, invitee.id) is not None:
             raise ConflictError(ALREADY_MEMBER_MESSAGE)
-        return await self._members.create(
-            workspace_id=workspace_id, user_id=invitee.id, role=payload.role
-        )
+        try:
+            return await self._members.create(
+                workspace_id=workspace_id, user_id=invitee.id, role=payload.role
+            )
+        except IntegrityError as exc:
+            await self._members.rollback()
+            if getattr(exc.orig, "sqlstate", None) == "23505":
+                raise ConflictError(ALREADY_MEMBER_MESSAGE) from exc
+            raise
 
     async def remove(self, workspace: Workspace, target_user_id: int) -> None:
         if target_user_id == workspace.owner_id:
