@@ -18,11 +18,13 @@ class FakeCache:
         self.values: dict[str, str] = {}
         self.ttls: dict[str, int] = {}
         self.increments: list[str] = []
+        self.gets: list[str] = []
         self.fail = False
 
     async def get(self, key: str) -> str | None:
         if self.fail:
             raise ConnectionError("cache unavailable")
+        self.gets.append(key)
         return self.values.get(key)
 
     async def set(self, key: str, value: str, *, ttl: int) -> None:
@@ -158,3 +160,57 @@ async def test_task_mutation_increments_project_cache_version(
     await client.delete(f"/api/v1/tasks/{task_id}", headers=headers)
 
     assert fake_cache.increments.count(version_key) == 3
+
+
+async def test_label_and_comment_mutations_invalidate_task_cache(
+    client: AsyncClient, fake_cache: FakeCache
+) -> None:
+    headers = await login_as(client, "cache-related-mutations@example.com")
+    project_id = await create_project(client, headers)
+    task = await client.post(
+        f"/api/v1/projects/{project_id}/tasks", json={"title": "Cache task"}, headers=headers
+    )
+    assert task.status_code == 201
+    task_id = task.json()["id"]
+    label = await client.post(
+        f"/api/v1/projects/{project_id}/labels",
+        json={"name": "cache-label", "color": "#123456"},
+        headers=headers,
+    )
+    assert label.status_code == 201
+    label_id = label.json()["id"]
+    version_key = task_cache_version_key(project_id)
+    baseline = len(fake_cache.increments)
+
+    assert (
+        await client.post(f"/api/v1/tasks/{task_id}/labels/{label_id}", headers=headers)
+    ).status_code == 204
+    assert (
+        await client.delete(f"/api/v1/tasks/{task_id}/labels/{label_id}", headers=headers)
+    ).status_code == 204
+    comment = await client.post(
+        f"/api/v1/tasks/{task_id}/comments",
+        json={"content": "invalidate cache"},
+        headers=headers,
+    )
+    assert comment.status_code == 201
+    comment_id = comment.json()["id"]
+    assert (
+        await client.delete(f"/api/v1/tasks/{task_id}/comments/{comment_id}", headers=headers)
+    ).status_code == 204
+
+    assert fake_cache.increments[baseline:].count(version_key) == 4
+
+
+async def test_workspace_outsider_is_rejected_before_task_cache_read(
+    client: AsyncClient, fake_cache: FakeCache
+) -> None:
+    owner = await login_as(client, "cache-owner-rbac@example.com")
+    project_id = await create_project(client, owner)
+    outsider = await login_as(client, "cache-outsider@example.com")
+    fake_cache.gets.clear()
+
+    response = await client.get(f"/api/v1/projects/{project_id}/tasks", headers=outsider)
+
+    assert response.status_code == 404
+    assert fake_cache.gets == []
