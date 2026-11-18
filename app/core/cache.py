@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Sequence
-from typing import Protocol, cast
+from typing import Protocol
 
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
@@ -102,7 +102,8 @@ def task_cache_payload_json(items: Sequence[object], total: int, page: int, limi
     from app.schemas.page import PageResponse
     from app.schemas.task import TaskRead
 
+    task_items = [TaskRead.model_validate(item) for item in items]
     payload = PageResponse[TaskRead](
-        items=cast(list[TaskRead], list(items)), total=total, page=page, limit=limit
+        items=task_items, total=total, page=page, limit=limit
     )
     return payload.model_dump_json()
