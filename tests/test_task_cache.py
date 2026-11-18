@@ -84,6 +84,15 @@ def test_task_cache_key_normalizes_filter_order() -> None:
     assert task_cache_data_key(7, 2, first, pagination) != task_cache_data_key(
         8, 2, first, pagination
     )
+    assert task_cache_data_key(7, 2, first, Pagination(page=2, limit=20)) != task_cache_data_key(
+        7, 2, first, Pagination(page=1, limit=20)
+    )
+    assert task_cache_data_key(
+        7,
+        2,
+        TaskFilters(status=[TaskStatus.DONE], priority=first.priority, assignee_id=4),
+        pagination,
+    ) != task_cache_data_key(7, 2, first, pagination)
 
 
 async def test_task_cache_hit_avoids_second_repository_query(
