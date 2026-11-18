@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Sequence
-from typing import Protocol
+from typing import Protocol, cast
 
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
