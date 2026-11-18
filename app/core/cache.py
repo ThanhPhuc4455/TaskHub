@@ -103,7 +103,5 @@ def task_cache_payload_json(items: Sequence[object], total: int, page: int, limi
     from app.schemas.task import TaskRead
 
     task_items = [TaskRead.model_validate(item) for item in items]
-    payload = PageResponse[TaskRead](
-        items=task_items, total=total, page=page, limit=limit
-    )
+    payload = PageResponse[TaskRead](items=task_items, total=total, page=page, limit=limit)
     return payload.model_dump_json()
