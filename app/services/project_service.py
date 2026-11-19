@@ -7,6 +7,7 @@ from app.models.enums import ProjectStatus, WorkspaceMemberRole
 from app.models.project import Project
 from app.models.user import User
 from app.models.workspace import Workspace
+from app.models.workspace_member import WorkspaceMember
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectUpdate
 from app.services.project_policy import ensure_project_active
@@ -17,6 +18,8 @@ from app.services.workspace_service import WorkspaceService
 class ProjectAccessContext:
     project: Project
     workspace: Workspace
+    membership: WorkspaceMember | None
+    effective_role: WorkspaceMemberRole
 
 
 class ProjectService:
@@ -39,11 +42,16 @@ class ProjectService:
     async def require_project_role(
         self, project_id: int, user: User, required: WorkspaceMemberRole
     ) -> ProjectAccessContext:
-        project = await self._projects.get(project_id)
+        project = await self._projects.get_with_workspace(project_id)
         if project is None:
             raise NotFoundError("Project", project_id)
-        workspace = await self._workspaces.authorize(project.workspace_id, user, required)
-        return ProjectAccessContext(project=project, workspace=workspace)
+        access = await self._workspaces.authorize_context(project.workspace_id, user, required)
+        return ProjectAccessContext(
+            project=project,
+            workspace=access.workspace,
+            membership=access.membership,
+            effective_role=access.effective_role,
+        )
 
     async def get(self, access: ProjectAccessContext) -> Project:
         return access.project
