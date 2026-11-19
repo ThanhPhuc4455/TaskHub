@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.core.messages import PROJECT_ARCHIVED_MESSAGE
-from app.core.pagination import Pagination
+from app.core.pagination import PageResult, Pagination
 from app.models.enums import ProjectStatus, WorkspaceMemberRole
 from app.models.project import Project
 from app.models.user import User
@@ -32,10 +32,8 @@ class ProjectService:
 
     async def list_for_workspace(
         self, access: Workspace, pagination: Pagination
-    ) -> tuple[list[Project], int]:
-        return await self._projects.list_by_workspace(
-            access.id, offset=pagination.offset, limit=pagination.limit
-        )
+    ) -> PageResult[Project]:
+        return await self._projects.list_by_workspace(access.id, pagination)
 
     async def require_project_role(
         self, project_id: int, user: User, required: WorkspaceMemberRole

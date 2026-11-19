@@ -6,7 +6,7 @@ from app.core.messages import (
     CANNOT_CHANGE_OWNER_ROLE_MESSAGE,
     CANNOT_REMOVE_OWNER_MESSAGE,
 )
-from app.core.pagination import Pagination
+from app.core.pagination import PageResult, Pagination
 from app.models.workspace import Workspace
 from app.models.workspace_member import WorkspaceMember
 from app.repositories.user_repository import UserRepository
@@ -28,10 +28,8 @@ class MemberService:
 
     async def list_members(
         self, workspace_id: int, pagination: Pagination
-    ) -> tuple[list[WorkspaceMember], int]:
-        return await self._members.list_by_workspace(
-            workspace_id, offset=pagination.offset, limit=pagination.limit
-        )
+    ) -> PageResult[WorkspaceMember]:
+        return await self._members.list_by_workspace(workspace_id, pagination)
 
     async def invite(self, workspace_id: int, payload: InviteMemberRequest) -> WorkspaceMember:
         invitee = await self._users.get_by_email(payload.email.lower())

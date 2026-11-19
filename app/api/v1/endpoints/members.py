@@ -27,9 +27,12 @@ async def list_members(
     workspace: WorkspaceViewer,
     pagination: PaginationDep,
 ) -> PageResponse[MemberRead]:
-    items, total = await service.list_members(workspace_id, pagination)
+    result = await service.list_members(workspace_id, pagination)
     return PageResponse.from_result(
-        cast(list[MemberRead], items), total, pagination.page, pagination.limit
+        cast(list[MemberRead], result.items),
+        result.total,
+        pagination.page,
+        pagination.limit,
     )
 
 
