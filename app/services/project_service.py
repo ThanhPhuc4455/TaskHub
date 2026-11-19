@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
+from app.core.messages import PROJECT_ARCHIVED_MESSAGE
 from app.core.pagination import Pagination
 from app.models.enums import ProjectStatus, WorkspaceMemberRole
 from app.models.project import Project
@@ -55,6 +56,8 @@ class ProjectService:
         return await self._projects.update(access.project, data)
 
     async def archive(self, access: ProjectAccessContext) -> Project:
+        if access.project.status == ProjectStatus.ARCHIVED:
+            raise ConflictError(PROJECT_ARCHIVED_MESSAGE)
         return await self._projects.update(access.project, {"status": ProjectStatus.ARCHIVED})
 
     async def delete(self, access: ProjectAccessContext) -> None:

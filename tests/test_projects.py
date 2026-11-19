@@ -95,6 +95,10 @@ async def test_owner_can_archive_project(client: AsyncClient) -> None:
     assert archive.status_code == 200
     assert archive.json()["status"] == "ARCHIVED"
 
+    archive_again = await client.post(f"/api/v1/projects/{project_id}/archive", headers=owner)
+    assert archive_again.status_code == 409
+    assert archive_again.json()["detail"] == "Archived projects cannot be modified"
+
     update = await client.patch(
         f"/api/v1/projects/{project_id}",
         json={"name": "No longer editable"},
