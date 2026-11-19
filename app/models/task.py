@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.constants import ENUM_MAX_LENGTH, TASK_TITLE_MAX_LENGTH
@@ -19,12 +19,12 @@ if TYPE_CHECKING:
 
 class Task(Base):
     __tablename__ = "tasks"
+    __table_args__ = (Index("ix_tasks_project_created_at_id", "project_id", "created_at", "id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"),
-        index=True,
         nullable=False,
     )
 
