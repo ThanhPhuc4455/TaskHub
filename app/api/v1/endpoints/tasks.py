@@ -1,10 +1,8 @@
-import logging
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 
 from app.api.deps import (
-    CacheDep,
     CurrentUser,
     NotificationServiceDep,
     PaginationDep,
@@ -13,11 +11,6 @@ from app.api.deps import (
     require_task_role,
 )
 from app.api.responses import RBAC_RESPONSES
-from app.core.cache import (
-    CACHE_BACKEND_ERRORS,
-    read_task_cache,
-    write_task_cache,
-)
 from app.models.enums import TaskPriority, TaskStatus, WorkspaceMemberRole
 from app.models.task import Task
 from app.repositories.task_repository import TaskFilters
@@ -28,7 +21,6 @@ from app.services.project_service import ProjectAccessContext
 from app.services.task_service import TaskAccessContext
 
 router = APIRouter(tags=["tasks"], responses=RBAC_RESPONSES)
-logger = logging.getLogger(__name__)
 
 ProjectViewer = Annotated[
     ProjectAccessContext,
@@ -61,17 +53,17 @@ async def create_task(
     background_tasks: BackgroundTasks,
     notification: NotificationServiceDep,
 ) -> Task:
-    task = await service.create(access, current_user, payload)
-    if task.assignee is not None and task.assignee.id != current_user.id:
+    result = await service.create(access, current_user, payload)
+    if result.should_notify_assignee and result.task.assignee is not None:
         background_tasks.add_task(
             notify_task_assigned_safely,
             notification,
-            recipient_email=task.assignee.email,
-            task_title=task.title,
+            recipient_email=result.task.assignee.email,
+            task_title=result.task.title,
             project_name=access.project.name,
             assigner_name=current_user.full_name,
         )
-    return task
+    return result.task
 
 
 @router.get("/projects/{project_id}/tasks", response_model=PageResponse[TaskRead])
@@ -79,30 +71,12 @@ async def list_tasks(
     access: ProjectViewer,
     service: TaskServiceDep,
     pagination: PaginationDep,
-    cache: CacheDep,
     status_filter: Annotated[list[TaskStatus] | None, Query(alias="status")] = None,
     priority: Annotated[list[TaskPriority] | None, Query()] = None,
     assignee_id: Annotated[int | None, Query(ge=1)] = None,
 ) -> PageResponse[TaskRead]:
     filters = TaskFilters(status=status_filter, priority=priority, assignee_id=assignee_id)
-    cache_key: str | None = None
-    try:
-        cache_key, cached = await read_task_cache(cache, access.project.id, filters, pagination)
-        if cached is not None:
-            return PageResponse[TaskRead].model_validate_json(cached)
-    except CACHE_BACKEND_ERRORS:
-        logger.warning("Task cache read failed for project_id=%s", access.project.id, exc_info=True)
-    result = await service.list_tasks(access, filters, pagination)
-    items = [TaskRead.model_validate(item) for item in result.items]
-    response = PageResponse.from_result(items, result.total, pagination.page, pagination.limit)
-    if cache_key is not None:
-        try:
-            await write_task_cache(cache, cache_key, response.model_dump_json())
-        except CACHE_BACKEND_ERRORS:
-            logger.warning(
-                "Task cache write failed for project_id=%s", access.project.id, exc_info=True
-            )
-    return response
+    return await service.list_tasks(access, filters, pagination)
 
 
 @router.get("/tasks/{task_id}", response_model=TaskRead)
@@ -119,23 +93,17 @@ async def update_task(
     background_tasks: BackgroundTasks,
     notification: NotificationServiceDep,
 ) -> Task:
-    previous_assignee_id = access.task.assignee_id
-    task = await service.update(access, payload)
-    if (
-        "assignee_id" in payload.model_fields_set
-        and task.assignee is not None
-        and task.assignee.id != previous_assignee_id
-        and task.assignee.id != current_user.id
-    ):
+    result = await service.update(access, current_user, payload)
+    if result.should_notify_assignee and result.task.assignee is not None:
         background_tasks.add_task(
             notify_task_assigned_safely,
             notification,
-            recipient_email=task.assignee.email,
-            task_title=task.title,
+            recipient_email=result.task.assignee.email,
+            task_title=result.task.title,
             project_name=access.project.name,
             assigner_name=current_user.full_name,
         )
-    return task
+    return result.task
 
 
 @router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
