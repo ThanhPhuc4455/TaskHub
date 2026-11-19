@@ -215,3 +215,48 @@ async def test_workspace_outsider_is_rejected_before_task_cache_read(
 
     assert response.status_code == 404
     assert fake_cache.gets == []
+
+
+async def test_profile_label_and_project_mutations_invalidate_task_cache(
+    client: AsyncClient, fake_cache: FakeCache
+) -> None:
+    headers = await login_as(client, "cache-broad-mutations@example.com")
+    project_id = await create_project(client, headers)
+    current_user = await client.get("/api/v1/users/me", headers=headers)
+    assert current_user.status_code == 200
+    task = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "Assigned cache task", "assignee_id": current_user.json()["id"]},
+        headers=headers,
+    )
+    assert task.status_code == 201
+    version_key = task_cache_version_key(project_id)
+    fake_cache.increments.clear()
+
+    profile = await client.patch(
+        "/api/v1/users/me", json={"full_name": "Updated cache owner"}, headers=headers
+    )
+    assert profile.status_code == 200
+
+    label = await client.post(
+        f"/api/v1/projects/{project_id}/labels",
+        json={"name": "broad-label", "color": "#654321"},
+        headers=headers,
+    )
+    assert label.status_code == 201
+    label_id = label.json()["id"]
+    updated_label = await client.patch(
+        f"/api/v1/labels/{label_id}", json={"name": "updated-label"}, headers=headers
+    )
+    assert updated_label.status_code == 200, updated_label.text
+    deleted_label = await client.delete(f"/api/v1/labels/{label_id}", headers=headers)
+    assert deleted_label.status_code == 204
+
+    archived = await client.post(f"/api/v1/projects/{project_id}/archive", headers=headers)
+    assert archived.status_code == 200
+    unarchived = await client.post(f"/api/v1/projects/{project_id}/unarchive", headers=headers)
+    assert unarchived.status_code == 200
+    deleted_project = await client.delete(f"/api/v1/projects/{project_id}", headers=headers)
+    assert deleted_project.status_code == 204
+
+    assert fake_cache.increments.count(version_key) == 7
