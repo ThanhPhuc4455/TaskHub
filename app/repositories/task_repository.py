@@ -7,7 +7,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.pagination import Pagination
+from app.core.pagination import PageResult, Pagination
 from app.models.label import task_labels
 from app.models.task import Task, TaskPriority, TaskStatus
 from app.repositories.base import BaseRepository
@@ -18,12 +18,6 @@ class TaskFilters:
     status: list[TaskStatus] | None = None
     priority: list[TaskPriority] | None = None
     assignee_id: int | None = None
-
-
-@dataclass(frozen=True)
-class TaskPage:
-    items: list[Task]
-    total: int
 
 
 class TaskRepository(BaseRepository[Task]):
@@ -49,7 +43,7 @@ class TaskRepository(BaseRepository[Task]):
 
     async def list_by_project(
         self, project_id: int, filters: TaskFilters, pagination: Pagination
-    ) -> TaskPage:
+    ) -> PageResult[Task]:
         conditions = self._where(project_id, filters)
         total = await self.session.scalar(select(func.count()).select_from(Task).where(*conditions))
         stmt = (
@@ -61,7 +55,7 @@ class TaskRepository(BaseRepository[Task]):
             .limit(pagination.limit)
         )
         result = await self.session.scalars(stmt)
-        return TaskPage(items=list(result.all()), total=total or 0)
+        return PageResult(items=list(result.all()), total=total or 0)
 
     async def project_ids_by_assignee(self, user_id: int) -> list[int]:
         result = await self.session.scalars(

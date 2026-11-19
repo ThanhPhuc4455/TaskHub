@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 
-from app.core.exceptions import NotFoundError
-from app.core.pagination import Pagination
+from app.core.exceptions import ConflictError, NotFoundError
+from app.core.messages import PROJECT_ARCHIVED_MESSAGE
+from app.core.pagination import PageResult, Pagination
 from app.models.enums import ProjectStatus, WorkspaceMemberRole
 from app.models.project import Project
 from app.models.user import User
 from app.models.workspace import Workspace
+from app.models.workspace_member import WorkspaceMember
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.project import ProjectCreate, ProjectUpdate
 from app.services.project_policy import ensure_project_active
@@ -16,6 +18,8 @@ from app.services.workspace_service import WorkspaceService
 class ProjectAccessContext:
     project: Project
     workspace: Workspace
+    membership: WorkspaceMember | None
+    effective_role: WorkspaceMemberRole
 
 
 class ProjectService:
@@ -32,19 +36,22 @@ class ProjectService:
 
     async def list_for_workspace(
         self, access: Workspace, pagination: Pagination
-    ) -> tuple[list[Project], int]:
-        return await self._projects.list_by_workspace(
-            access.id, offset=pagination.offset, limit=pagination.limit
-        )
+    ) -> PageResult[Project]:
+        return await self._projects.list_by_workspace(access.id, pagination)
 
     async def require_project_role(
         self, project_id: int, user: User, required: WorkspaceMemberRole
     ) -> ProjectAccessContext:
-        project = await self._projects.get(project_id)
+        project = await self._projects.get_with_workspace(project_id)
         if project is None:
             raise NotFoundError("Project", project_id)
-        workspace = await self._workspaces.authorize(project.workspace_id, user, required)
-        return ProjectAccessContext(project=project, workspace=workspace)
+        access = await self._workspaces.authorize_context(project.workspace_id, user, required)
+        return ProjectAccessContext(
+            project=project,
+            workspace=access.workspace,
+            membership=access.membership,
+            effective_role=access.effective_role,
+        )
 
     async def get(self, access: ProjectAccessContext) -> Project:
         return access.project
@@ -55,6 +62,8 @@ class ProjectService:
         return await self._projects.update(access.project, data)
 
     async def archive(self, access: ProjectAccessContext) -> Project:
+        if access.project.status == ProjectStatus.ARCHIVED:
+            raise ConflictError(PROJECT_ARCHIVED_MESSAGE)
         return await self._projects.update(access.project, {"status": ProjectStatus.ARCHIVED})
 
     async def unarchive(self, access: ProjectAccessContext) -> Project:

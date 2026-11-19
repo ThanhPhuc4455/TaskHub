@@ -12,6 +12,6 @@ class Pagination:
 
 
 @dataclass(frozen=True)
-class PageResult[ItemT]:
-    items: list[ItemT]
+class PageResult[T]:
+    items: list[T]
     total: int

@@ -1,5 +1,6 @@
 from collections.abc import Awaitable, Callable
-from typing import Annotated, Any, cast
+from dataclasses import dataclass
+from typing import Annotated
 
 from fastapi import Depends, Query, Request
 from fastapi.security import OAuth2PasswordBearer
@@ -13,10 +14,7 @@ from app.core.exceptions import ForbiddenError, NotFoundError
 from app.core.messages import FORBIDDEN_MESSAGE
 from app.core.pagination import Pagination
 from app.core.security import TokenType, decode_token
-from app.models.comment import Comment
 from app.models.enums import WorkspaceMemberRole
-from app.models.label import Label
-from app.models.task import Task
 from app.models.user import User, UserRole
 from app.models.workspace import Workspace
 from app.repositories.comment_repository import CommentRepository
@@ -222,7 +220,9 @@ WorkspaceViewer = Annotated[Workspace, Depends(require_workspace_role(WorkspaceM
 WorkspaceOwner = Annotated[Workspace, Depends(require_workspace_role(WorkspaceMemberRole.OWNER))]
 
 
-def require_project_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
+def require_project_role(
+    required: WorkspaceMemberRole,
+) -> Callable[..., Awaitable[ProjectAccessContext]]:
     async def dependency(
         project_id: int, projects: ProjectServiceDep, current_user: CurrentUser
     ) -> ProjectAccessContext:
@@ -231,89 +231,118 @@ def require_project_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
     return dependency
 
 
-def require_project_resource_role(
-    required: WorkspaceMemberRole, resource: str
-) -> Callable[..., Any]:
+@dataclass(frozen=True)
+class ResourceDependencies:
+    comments: CommentRepository
+    tasks: TaskRepository
+    labels: LabelRepository
+    projects: ProjectService
+    task_id: int | None
+    label_id: int | None
+    comment_id: int | None
+
+
+async def _load_task_context(
+    resources: ResourceDependencies, user: User, required: WorkspaceMemberRole
+) -> TaskAccessContext:
+    if resources.task_id is None:
+        raise NotFoundError("Task", "missing")
+    task = await resources.tasks.get_with_details(resources.task_id)
+    if task is None:
+        raise NotFoundError("Task", resources.task_id)
+    access = await resources.projects.require_project_role(task.project_id, user, required)
+    return TaskAccessContext(
+        task=task,
+        project=access.project,
+        workspace=access.workspace,
+        effective_role=access.effective_role,
+    )
+
+
+async def _load_label_context(
+    resources: ResourceDependencies, user: User, required: WorkspaceMemberRole
+) -> LabelAccessContext:
+    if resources.label_id is None:
+        raise NotFoundError("Label", "missing")
+    label = await resources.labels.get(resources.label_id)
+    if label is None:
+        raise NotFoundError("Label", resources.label_id)
+    access = await resources.projects.require_project_role(label.project_id, user, required)
+    return LabelAccessContext(
+        label=label,
+        project=access.project,
+        workspace=access.workspace,
+        effective_role=access.effective_role,
+    )
+
+
+async def _load_comment_context(
+    resources: ResourceDependencies, user: User, required: WorkspaceMemberRole
+) -> CommentAccessContext:
+    if resources.task_id is None or resources.comment_id is None:
+        raise NotFoundError("Comment", resources.comment_id or "missing")
+    comment = await resources.comments.get_with_author(resources.comment_id)
+    if comment is None or comment.task_id != resources.task_id:
+        raise NotFoundError("Comment", resources.comment_id)
+    task = await resources.tasks.get_with_details(resources.task_id)
+    if task is None:
+        raise NotFoundError("Task", resources.task_id)
+    access = await resources.projects.require_project_role(task.project_id, user, required)
+    return CommentAccessContext(
+        comment=comment,
+        task=TaskAccessContext(
+            task=task,
+            project=access.project,
+            workspace=access.workspace,
+            effective_role=access.effective_role,
+        ),
+    )
+
+
+def require_resource_role[ResourceContext](
+    required: WorkspaceMemberRole,
+    loader: Callable[[ResourceDependencies, User, WorkspaceMemberRole], Awaitable[ResourceContext]],
+) -> Callable[..., Awaitable[ResourceContext]]:
     async def dependency(
         comments: Annotated[CommentRepository, Depends(get_comment_repository)],
         tasks: Annotated[TaskRepository, Depends(get_task_repository)],
         labels: Annotated[LabelRepository, Depends(get_label_repository)],
         projects: ProjectServiceDep,
         current_user: CurrentUser,
-        members: Annotated[WorkspaceMemberRepository, Depends(get_workspace_member_repository)],
         task_id: int | None = None,
         label_id: int | None = None,
         comment_id: int | None = None,
-    ) -> TaskAccessContext | LabelAccessContext | CommentAccessContext:
-        if resource == "task":
-            if task_id is None:
-                raise NotFoundError("Task", "missing")
-            task = await tasks.get_with_details(task_id)
-            if task is None:
-                raise NotFoundError("Task", task_id)
-            access = await projects.require_project_role(task.project_id, current_user, required)
-        elif resource == "label":
-            if label_id is None:
-                raise NotFoundError("Label", "missing")
-            label = await labels.get(label_id)
-            if label is None:
-                raise NotFoundError("Label", label_id)
-            access = await projects.require_project_role(label.project_id, current_user, required)
-        elif resource == "comment":
-            if task_id is None or comment_id is None:
-                raise NotFoundError("Comment", comment_id or "missing")
-            comment = await comments.get_with_author(comment_id)
-            if comment is None or comment.task_id != task_id:
-                raise NotFoundError("Comment", comment_id)
-            task = await tasks.get_with_details(task_id)
-            if task is None:
-                raise NotFoundError("Task", task_id)
-            access = await projects.require_project_role(task.project_id, current_user, required)
-        else:
-            raise NotFoundError("Resource", resource)
-
-        if current_user.role == UserRole.ADMIN:
-            role = WorkspaceMemberRole.OWNER
-        else:
-            membership = await members.get_membership(access.workspace.id, current_user.id)
-            if membership is None:
-                raise NotFoundError("Workspace", access.workspace.id)
-            role = membership.role
-
-        if resource == "task":
-            return TaskAccessContext(
-                task=cast(Task, task),
-                project=access.project,
-                workspace=access.workspace,
-                effective_role=role,
-            )
-        if resource == "label":
-            return LabelAccessContext(
-                label=cast(Label, label),
-                project=access.project,
-                workspace=access.workspace,
-                effective_role=role,
-            )
-        return CommentAccessContext(
-            comment=cast(Comment, comment),
-            task=TaskAccessContext(
-                task=cast(Task, task),
-                project=access.project,
-                workspace=access.workspace,
-                effective_role=role,
+    ) -> ResourceContext:
+        return await loader(
+            ResourceDependencies(
+                comments=comments,
+                tasks=tasks,
+                labels=labels,
+                projects=projects,
+                task_id=task_id,
+                label_id=label_id,
+                comment_id=comment_id,
             ),
+            current_user,
+            required,
         )
 
     return dependency
 
 
-def require_task_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
-    return require_project_resource_role(required, "task")
+def require_task_role(
+    required: WorkspaceMemberRole,
+) -> Callable[..., Awaitable[TaskAccessContext]]:
+    return require_resource_role(required, _load_task_context)
 
 
-def require_label_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
-    return require_project_resource_role(required, "label")
+def require_label_role(
+    required: WorkspaceMemberRole,
+) -> Callable[..., Awaitable[LabelAccessContext]]:
+    return require_resource_role(required, _load_label_context)
 
 
-def require_comment_role(required: WorkspaceMemberRole) -> Callable[..., Any]:
-    return require_project_resource_role(required, "comment")
+def require_comment_role(
+    required: WorkspaceMemberRole,
+) -> Callable[..., Awaitable[CommentAccessContext]]:
+    return require_resource_role(required, _load_comment_context)

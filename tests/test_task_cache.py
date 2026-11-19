@@ -6,10 +6,11 @@ from httpx import AsyncClient
 
 from app.api.deps import get_cache_backend
 from app.core.cache import task_cache_data_key, task_cache_version_key
-from app.core.pagination import Pagination
+from app.core.pagination import PageResult, Pagination
 from app.main import app as fastapi_app
 from app.models.enums import TaskPriority, TaskStatus
-from app.repositories.task_repository import TaskFilters, TaskPage, TaskRepository
+from app.models.task import Task
+from app.repositories.task_repository import TaskFilters, TaskRepository
 from tests.helpers import login_as
 
 
@@ -112,7 +113,7 @@ async def test_task_cache_hit_avoids_second_repository_query(
 
     async def counted(
         self: TaskRepository, project: int, filters: TaskFilters, pagination: Pagination
-    ) -> TaskPage:
+    ) -> PageResult[Task]:
         nonlocal calls
         calls += 1
         return await original(self, project, filters, pagination)

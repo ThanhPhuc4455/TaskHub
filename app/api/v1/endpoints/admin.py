@@ -18,7 +18,10 @@ async def list_all_workspaces(
     service: WorkspaceServiceDep,
     pagination: PaginationDep,
 ) -> PageResponse[WorkspaceRead]:
-    items, total = await service.list_all(pagination)
+    result = await service.list_all(pagination)
     return PageResponse.from_result(
-        cast(list[WorkspaceRead], items), total, pagination.page, pagination.limit
+        cast(list[WorkspaceRead], result.items),
+        result.total,
+        pagination.page,
+        pagination.limit,
     )

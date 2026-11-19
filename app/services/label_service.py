@@ -8,7 +8,7 @@ from app.core.messages import (
     LABEL_ALREADY_EXISTS_MESSAGE,
     LABEL_PROJECT_MISMATCH_MESSAGE,
 )
-from app.core.pagination import Pagination
+from app.core.pagination import PageResult, Pagination
 from app.models.enums import WorkspaceMemberRole
 from app.models.label import Label
 from app.models.project import Project
@@ -48,10 +48,8 @@ class LabelService:
 
     async def list_labels(
         self, access: ProjectAccessContext, pagination: Pagination
-    ) -> tuple[list[Label], int]:
-        return await self._labels.list_by_project(
-            access.project.id, offset=pagination.offset, limit=pagination.limit
-        )
+    ) -> PageResult[Label]:
+        return await self._labels.list_by_project(access.project.id, pagination)
 
     async def update(self, access: LabelAccessContext, payload: LabelUpdate) -> Label:
         ensure_project_active(access.project)

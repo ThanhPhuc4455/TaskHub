@@ -66,9 +66,12 @@ async def list_projects(
     service: ProjectServiceDep,
     pagination: PaginationDep,
 ) -> PageResponse[ProjectRead]:
-    items, total = await service.list_for_workspace(access, pagination)
+    result = await service.list_for_workspace(access, pagination)
     return PageResponse.from_result(
-        cast(list[ProjectRead], items), total, pagination.page, pagination.limit
+        cast(list[ProjectRead], result.items),
+        result.total,
+        pagination.page,
+        pagination.limit,
     )
 
 

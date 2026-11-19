@@ -1,12 +1,21 @@
+from dataclasses import dataclass
+
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.core.messages import FORBIDDEN_MESSAGE
-from app.core.pagination import Pagination
+from app.core.pagination import PageResult, Pagination
 from app.models.user import User, UserRole
 from app.models.workspace import Workspace
-from app.models.workspace_member import WorkspaceMemberRole
+from app.models.workspace_member import WorkspaceMember, WorkspaceMemberRole
 from app.repositories.workspace_member_repository import WorkspaceMemberRepository
 from app.repositories.workspace_repository import WorkspaceRepository
 from app.schemas.workspace import WorkspaceCreate, WorkspaceUpdate
+
+
+@dataclass(frozen=True)
+class WorkspaceAccessContext:
+    workspace: Workspace
+    membership: WorkspaceMember | None
+    effective_role: WorkspaceMemberRole
 
 
 class WorkspaceService:
@@ -17,17 +26,31 @@ class WorkspaceService:
     async def authorize(
         self, workspace_id: int, user: User, required: WorkspaceMemberRole
     ) -> Workspace:
+        access = await self.authorize_context(workspace_id, user, required)
+        return access.workspace
+
+    async def authorize_context(
+        self, workspace_id: int, user: User, required: WorkspaceMemberRole
+    ) -> WorkspaceAccessContext:
         workspace = await self._workspaces.get(workspace_id)
         if workspace is None:
             raise NotFoundError("Workspace", workspace_id)
         if user.role == UserRole.ADMIN:
-            return workspace
+            return WorkspaceAccessContext(
+                workspace=workspace,
+                membership=None,
+                effective_role=WorkspaceMemberRole.OWNER,
+            )
         membership = await self._members.get_membership(workspace_id, user.id)
         if membership is None:
             raise NotFoundError("Workspace", workspace_id)
         if membership.role.rank < required.rank:
             raise ForbiddenError(FORBIDDEN_MESSAGE)
-        return workspace
+        return WorkspaceAccessContext(
+            workspace=workspace,
+            membership=membership,
+            effective_role=membership.role,
+        )
 
     async def require_role(
         self, workspace_id: int, user: User, required: WorkspaceMemberRole
@@ -47,17 +70,13 @@ class WorkspaceService:
         await self._workspaces.commit()
         return workspace
 
-    async def list_for_user(
-        self, user: User, pagination: Pagination
-    ) -> tuple[list[Workspace], int]:
+    async def list_for_user(self, user: User, pagination: Pagination) -> PageResult[Workspace]:
         if user.role == UserRole.ADMIN:
-            return await self._workspaces.get_page(offset=pagination.offset, limit=pagination.limit)
-        return await self._workspaces.get_for_user(
-            user.id, offset=pagination.offset, limit=pagination.limit
-        )
+            return await self._workspaces.get_page(pagination)
+        return await self._workspaces.get_for_user(user.id, pagination)
 
-    async def list_all(self, pagination: Pagination) -> tuple[list[Workspace], int]:
-        return await self._workspaces.get_page(offset=pagination.offset, limit=pagination.limit)
+    async def list_all(self, pagination: Pagination) -> PageResult[Workspace]:
+        return await self._workspaces.get_page(pagination)
 
     async def get(self, workspace: Workspace) -> Workspace:
         return workspace

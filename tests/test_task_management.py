@@ -105,6 +105,26 @@ async def test_task_create_validation(client: AsyncClient) -> None:
     assert future.json()["status"] == "TODO"
 
 
+async def test_task_patch_rejects_naive_due_date(client: AsyncClient) -> None:
+    owner = await login_as(client, "task-patch-due-date@example.com")
+    project_id = await project_for(client, owner, "Patch due date workspace")
+    created = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "Patch due date"},
+        headers=owner,
+    )
+    assert created.status_code == 201
+
+    naive_future = (datetime.now(UTC) + timedelta(days=1)).replace(tzinfo=None).isoformat()
+    response = await client.patch(
+        f"/api/v1/tasks/{created.json()['id']}",
+        json={"due_date": naive_future},
+        headers=owner,
+    )
+
+    assert response.status_code == 422
+
+
 async def test_task_rbac_assignee_and_archived_project(client: AsyncClient) -> None:
     owner = await login_as(client, "task-owner-2@example.com")
     viewer = await login_as(client, "task-viewer@example.com")

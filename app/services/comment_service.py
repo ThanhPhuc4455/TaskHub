@@ -1,14 +1,11 @@
 from dataclasses import dataclass
 
-from app.core.exceptions import ForbiddenError
-from app.core.messages import COMMENT_NOT_OWNER_MESSAGE
-from app.core.pagination import Pagination
+from app.core.pagination import PageResult, Pagination
 from app.models.comment import Comment
-from app.models.enums import WorkspaceMemberRole
 from app.models.user import User
 from app.repositories.comment_repository import CommentRepository
 from app.schemas.comment import CommentCreate
-from app.services.project_policy import ensure_project_active
+from app.services.project_policy import ensure_comment_deletion_allowed, ensure_project_active
 from app.services.task_service import TaskAccessContext
 
 
@@ -33,13 +30,12 @@ class CommentService:
 
     async def list_comments(
         self, task: TaskAccessContext, pagination: Pagination
-    ) -> tuple[list[Comment], int]:
-        result = await self._comments.list_by_task(task.task.id, pagination)
-        return result.items, result.total
+    ) -> PageResult[Comment]:
+        return await self._comments.list_by_task(task.task.id, pagination)
 
     async def delete(self, access: CommentAccessContext, user: User) -> None:
         ensure_project_active(access.task.project)
-        is_owner = access.task.effective_role.rank >= WorkspaceMemberRole.OWNER.rank
-        if access.comment.author_id != user.id and not is_owner:
-            raise ForbiddenError(COMMENT_NOT_OWNER_MESSAGE)
+        ensure_comment_deletion_allowed(
+            access.comment.author_id, user.id, access.task.effective_role
+        )
         await self._comments.delete(access.comment)

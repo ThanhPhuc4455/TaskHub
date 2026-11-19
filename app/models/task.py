@@ -19,13 +19,12 @@ if TYPE_CHECKING:
 
 class Task(Base):
     __tablename__ = "tasks"
-    __table_args__ = (Index("ix_tasks_project_status", "project_id", "status"),)
+    __table_args__ = (Index("ix_tasks_project_created_at_id", "project_id", "created_at", "id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE"),
-        index=True,
         nullable=False,
     )
 
@@ -90,13 +89,20 @@ class Task(Base):
 
     project: Mapped["Project"] = relationship(back_populates="tasks")
 
-    assignee: Mapped["User | None"] = relationship(foreign_keys=[assignee_id])
+    assignee: Mapped["User | None"] = relationship(
+        foreign_keys=[assignee_id],
+        lazy="selectin",
+    )
 
-    creator: Mapped["User"] = relationship(foreign_keys=[created_by])
+    creator: Mapped["User"] = relationship(
+        foreign_keys=[created_by],
+        lazy="selectin",
+    )
 
     labels: Mapped[list["Label"]] = relationship(
         secondary="task_labels",
         back_populates="tasks",
+        lazy="selectin",
     )
 
     comments: Mapped[list["Comment"]] = relationship(
