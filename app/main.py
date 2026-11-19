@@ -17,6 +17,7 @@ from app.core.constants import (
     HTTP_ERROR_CODE,
     INTERNAL_SERVER_ERROR_CODE,
     REFRESH_TOKEN_CLEANUP_INTERVAL_SECONDS,
+    REQUEST_ID_HEADER,
     VALIDATION_ERROR_CODE,
 )
 from app.core.database import AsyncSessionLocal, engine
@@ -32,7 +33,7 @@ async def _cleanup_refresh_tokens_periodically() -> None:
     while True:
         try:
             async with AsyncSessionLocal() as session:
-                await RefreshTokenRepository(session).delete_expired_or_revoked()
+                await RefreshTokenRepository(session).delete_expired()
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -114,6 +115,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     return JSONResponse(
         status_code=500,
         content=_error_content(INTERNAL_SERVER_ERROR_MESSAGE, INTERNAL_SERVER_ERROR_CODE, request),
+        headers={REQUEST_ID_HEADER: _request_id(request)},
     )
 
 

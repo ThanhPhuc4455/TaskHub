@@ -76,8 +76,9 @@ def get_workspace_member_repository(
 def get_workspace_service(
     workspaces: Annotated[WorkspaceRepository, Depends(get_workspace_repository)],
     members: Annotated[WorkspaceMemberRepository, Depends(get_workspace_member_repository)],
+    cache: CacheDep,
 ) -> WorkspaceService:
-    return WorkspaceService(workspaces, members)
+    return WorkspaceService(workspaces, members, cache)
 
 
 WorkspaceServiceDep = Annotated[WorkspaceService, Depends(get_workspace_service)]
@@ -92,8 +93,9 @@ def get_project_repository(
 def get_project_service(
     projects: Annotated[ProjectRepository, Depends(get_project_repository)],
     workspaces: WorkspaceServiceDep,
+    cache: CacheDep,
 ) -> ProjectService:
-    return ProjectService(projects, workspaces)
+    return ProjectService(projects, workspaces, cache)
 
 
 ProjectServiceDep = Annotated[ProjectService, Depends(get_project_service)]
@@ -121,21 +123,24 @@ def get_task_service(
     tasks: Annotated[TaskRepository, Depends(get_task_repository)],
     projects: Annotated[ProjectRepository, Depends(get_project_repository)],
     members: Annotated[WorkspaceMemberRepository, Depends(get_workspace_member_repository)],
+    cache: CacheDep,
 ) -> TaskService:
-    return TaskService(tasks, projects, members)
+    return TaskService(tasks, projects, members, cache)
 
 
 def get_label_service(
     labels: Annotated[LabelRepository, Depends(get_label_repository)],
     tasks: Annotated[TaskRepository, Depends(get_task_repository)],
+    cache: CacheDep,
 ) -> LabelService:
-    return LabelService(labels, tasks)
+    return LabelService(labels, tasks, cache)
 
 
 def get_comment_service(
     comments: Annotated[CommentRepository, Depends(get_comment_repository)],
+    cache: CacheDep,
 ) -> CommentService:
-    return CommentService(comments)
+    return CommentService(comments, cache)
 
 
 TaskServiceDep = Annotated[TaskService, Depends(get_task_service)]
@@ -190,8 +195,10 @@ async def get_current_user(
 def get_user_service(
     users: UserRepositoryDep,
     tokens: Annotated[RefreshTokenRepository, Depends(get_refresh_token_repository)],
+    tasks: Annotated[TaskRepository, Depends(get_task_repository)],
+    cache: CacheDep,
 ) -> UserService:
-    return UserService(users, tokens)
+    return UserService(users, tokens, tasks, cache)
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]

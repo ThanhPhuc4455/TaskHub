@@ -42,6 +42,3 @@ class RefreshTokenRepository(BaseRepository[RefreshToken]):
         result = await self.session.execute(stmt)
         await self.commit()
         return int(getattr(result, "rowcount", 0) or 0)
-
-    async def delete_expired_or_revoked(self) -> int:
-        return await self.delete_expired()

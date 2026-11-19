@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from app.core.cache import CacheBackend, invalidate_task_cache
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.core.messages import FORBIDDEN_MESSAGE
 from app.core.pagination import PageResult, Pagination
@@ -19,9 +20,15 @@ class WorkspaceAccessContext:
 
 
 class WorkspaceService:
-    def __init__(self, workspaces: WorkspaceRepository, members: WorkspaceMemberRepository) -> None:
+    def __init__(
+        self,
+        workspaces: WorkspaceRepository,
+        members: WorkspaceMemberRepository,
+        cache: CacheBackend | None = None,
+    ) -> None:
         self._workspaces = workspaces
         self._members = members
+        self._cache = cache
 
     async def authorize(
         self, workspace_id: int, user: User, required: WorkspaceMemberRole
@@ -86,8 +93,8 @@ class WorkspaceService:
         return await self._workspaces.update(workspace, data)
 
     async def delete(self, workspace: Workspace) -> None:
+        project_ids = await self._workspaces.list_project_ids(workspace.id)
         await self._workspaces.delete(workspace)
-
-    async def project_ids(self, workspace_id: int, user: User) -> list[int]:
-        await self.require_role(workspace_id, user, WorkspaceMemberRole.OWNER)
-        return await self._workspaces.list_project_ids(workspace_id)
+        if self._cache is not None:
+            for project_id in project_ids:
+                await invalidate_task_cache(self._cache, project_id)

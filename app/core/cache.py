@@ -1,14 +1,13 @@
 import hashlib
 import json
 import logging
-from collections.abc import Sequence
 from typing import Protocol, cast
 
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
 from app.core.config import settings
-from app.core.constants import TASK_CACHE_KEY_PREFIX, TASK_CACHE_TTL_SECONDS
+from app.core.constants import TASK_CACHE_KEY_PREFIX
 from app.core.pagination import Pagination
 from app.repositories.task_repository import TaskFilters
 
@@ -86,7 +85,7 @@ async def read_task_cache(
 
 
 async def write_task_cache(cache: CacheBackend, key: str, value: str) -> None:
-    await cache.set(key, value, ttl=settings.cache_ttl_seconds or TASK_CACHE_TTL_SECONDS)
+    await cache.set(key, value, ttl=settings.cache_ttl_seconds)
 
 
 async def invalidate_task_cache(cache: CacheBackend, project_id: int) -> None:
@@ -96,12 +95,3 @@ async def invalidate_task_cache(cache: CacheBackend, project_id: int) -> None:
         logger.warning(
             "Task cache invalidation failed for project_id=%s", project_id, exc_info=True
         )
-
-
-def task_cache_payload_json(items: Sequence[object], total: int, page: int, limit: int) -> str:
-    from app.schemas.page import PageResponse
-    from app.schemas.task import TaskRead
-
-    task_items = [TaskRead.model_validate(item) for item in items]
-    payload = PageResponse[TaskRead](items=task_items, total=total, page=page, limit=limit)
-    return payload.model_dump_json()

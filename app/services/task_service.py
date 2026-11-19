@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from app.core.cache import CacheBackend, invalidate_task_cache
 from app.core.exceptions import UnprocessableEntityError
 from app.core.messages import ASSIGNEE_NOT_MEMBER_MESSAGE
 from app.core.pagination import PageResult, Pagination
@@ -30,10 +31,16 @@ class TaskService:
         tasks: TaskRepository,
         projects: ProjectRepository,
         members: WorkspaceMemberRepository,
+        cache: CacheBackend | None = None,
     ) -> None:
         self._tasks = tasks
         self._projects = projects
         self._members = members
+        self._cache = cache
+
+    async def _invalidate(self, project_id: int) -> None:
+        if self._cache is not None:
+            await invalidate_task_cache(self._cache, project_id)
 
     async def _check_assignee(self, workspace_id: int, assignee_id: int | None) -> None:
         if (
@@ -60,6 +67,7 @@ class TaskService:
             due_date=payload.due_date,
             created_by=user.id,
         )
+        await self._invalidate(access.project.id)
         return (await self._tasks.get_with_details(task.id)) or task
 
     async def list_tasks(
@@ -83,8 +91,10 @@ class TaskService:
         if "assignee_id" in data:
             await self._check_assignee(access.workspace.id, data["assignee_id"])
         updated = await self._tasks.update(access.task, data)
+        await self._invalidate(access.project.id)
         return (await self._tasks.get_with_details(updated.id)) or updated
 
     async def delete(self, access: TaskAccessContext) -> None:
         ensure_project_active(access.project)
         await self._tasks.delete(access.task)
+        await self._invalidate(access.project.id)

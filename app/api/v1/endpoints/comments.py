@@ -3,7 +3,6 @@ from typing import Annotated, cast
 from fastapi import APIRouter, Depends, status
 
 from app.api.deps import (
-    CacheDep,
     CommentServiceDep,
     CurrentUser,
     PaginationDep,
@@ -11,7 +10,6 @@ from app.api.deps import (
     require_task_role,
 )
 from app.api.responses import RBAC_RESPONSES
-from app.core.cache import invalidate_task_cache
 from app.models.comment import Comment
 from app.models.enums import WorkspaceMemberRole
 from app.schemas.comment import CommentCreate, CommentRead
@@ -45,11 +43,8 @@ async def create_comment(
     task: TaskEditor,
     current_user: CurrentUser,
     service: CommentServiceDep,
-    cache: CacheDep,
 ) -> Comment:
-    comment = await service.create(task, current_user, payload)
-    await invalidate_task_cache(cache, task.project.id)
-    return comment
+    return await service.create(task, current_user, payload)
 
 
 @router.get("/tasks/{task_id}/comments", response_model=PageResponse[CommentRead])
@@ -67,7 +62,5 @@ async def delete_comment(
     access: CommentViewer,
     current_user: CurrentUser,
     service: CommentServiceDep,
-    cache: CacheDep,
 ) -> None:
     await service.delete(access, current_user)
-    await invalidate_task_cache(cache, access.task.project.id)

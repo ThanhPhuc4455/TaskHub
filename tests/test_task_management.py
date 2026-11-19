@@ -169,11 +169,11 @@ async def test_task_rbac_assignee_and_archived_project(client: AsyncClient) -> N
     )
     assert viewer_blocked.status_code == 403
     assert viewer_blocked.json()["detail"]
-    assert viewer_blocked.json()["code"] == "application_error"
+    assert viewer_blocked.json()["code"] == "forbidden"
     assert viewer_blocked.json()["request_id"] == "day6-403"
     assert blocked.status_code == 409
     assert blocked.json()["detail"]
-    assert blocked.json()["code"] == "application_error"
+    assert blocked.json()["code"] == "conflict"
     assert blocked.json()["request_id"] == "day6-409"
 
 

@@ -25,8 +25,7 @@ class LoggingNotificationService:
         assigner_name: str,
     ) -> None:
         logger.info(
-            "Task assignment notification: recipient=%s task=%s project=%s assigner=%s",
-            recipient_email,
+            "Task assignment notification: task=%s project=%s assigner=%s",
             task_title,
             project_name,
             assigner_name,
@@ -49,4 +48,4 @@ async def notify_task_assigned_safely(
             assigner_name=assigner_name,
         )
     except Exception:
-        logger.exception("Task assignment notification failed for recipient=%s", recipient_email)
+        logger.exception("Task assignment notification failed")

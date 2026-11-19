@@ -15,7 +15,6 @@ from app.api.deps import (
 from app.api.responses import RBAC_RESPONSES
 from app.core.cache import (
     CACHE_BACKEND_ERRORS,
-    invalidate_task_cache,
     read_task_cache,
     write_task_cache,
 )
@@ -59,12 +58,10 @@ async def create_task(
     access: ProjectEditor,
     current_user: CurrentUser,
     service: TaskServiceDep,
-    cache: CacheDep,
     background_tasks: BackgroundTasks,
     notification: NotificationServiceDep,
 ) -> Task:
     task = await service.create(access, current_user, payload)
-    await invalidate_task_cache(cache, access.project.id)
     if task.assignee is not None and task.assignee.id != current_user.id:
         background_tasks.add_task(
             notify_task_assigned_safely,
@@ -118,14 +115,12 @@ async def update_task(
     payload: TaskUpdate,
     access: TaskEditor,
     service: TaskServiceDep,
-    cache: CacheDep,
     current_user: CurrentUser,
     background_tasks: BackgroundTasks,
     notification: NotificationServiceDep,
 ) -> Task:
     previous_assignee_id = access.task.assignee_id
     task = await service.update(access, payload)
-    await invalidate_task_cache(cache, access.project.id)
     if (
         "assignee_id" in payload.model_fields_set
         and task.assignee is not None
@@ -144,6 +139,5 @@ async def update_task(
 
 
 @router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_task(access: TaskEditor, service: TaskServiceDep, cache: CacheDep) -> None:
+async def delete_task(access: TaskEditor, service: TaskServiceDep) -> None:
     await service.delete(access)
-    await invalidate_task_cache(cache, access.project.id)

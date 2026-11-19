@@ -52,7 +52,7 @@ async def test_error_responses_keep_detail_and_add_request_id(
     assert not_found.status_code == 404
     assert not_found.json()["detail"] == "Workspace 999999 not found"
     assert not_found.json()["request_id"] == "error-404"
-    assert not_found.json()["code"] == "application_error"
+    assert not_found.json()["code"] == "not_found"
     assert invalid.status_code == 422
     assert invalid.json()["detail"]
     assert invalid.json()["request_id"] == "error-422"

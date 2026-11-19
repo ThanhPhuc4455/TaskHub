@@ -1,4 +1,3 @@
-import json
 import logging
 import re
 import time
@@ -7,12 +6,10 @@ from contextvars import ContextVar
 from typing import Any, cast
 
 from app.core.constants import (
-    INTERNAL_SERVER_ERROR_CODE,
     REQUEST_ID_ALLOWED_PATTERN,
     REQUEST_ID_HEADER,
     REQUEST_ID_MAX_LENGTH,
 )
-from app.core.messages import INTERNAL_SERVER_ERROR_MESSAGE
 
 logger = logging.getLogger(__name__)
 request_id_context: ContextVar[str] = ContextVar("request_id", default="-")
@@ -68,34 +65,6 @@ class RequestLoggingMiddleware:
 
         try:
             await self.app(scope, receive, send_with_request_id)
-        except Exception:
-            logger.exception(
-                "HTTP request failed method=%s path=%s status=%s duration_ms=%.2f request_id=%s",
-                scope.get("method", ""),
-                scope.get("path", ""),
-                status_code,
-                (time.perf_counter() - started) * 1000,
-                request_id,
-            )
-            if response_started:
-                raise
-            body = json.dumps(
-                {
-                    "detail": INTERNAL_SERVER_ERROR_MESSAGE,
-                    "code": INTERNAL_SERVER_ERROR_CODE,
-                    "request_id": request_id,
-                }
-            ).encode()
-            await send_with_request_id(
-                {
-                    "type": "http.response.start",
-                    "status": 500,
-                    "headers": [(b"content-type", b"application/json")],
-                }
-            )
-            await send_with_request_id(
-                {"type": "http.response.body", "body": body, "more_body": False}
-            )
         finally:
             logger.info(
                 "HTTP request method=%s path=%s status=%s duration_ms=%.2f request_id=%s",

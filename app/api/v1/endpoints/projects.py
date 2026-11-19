@@ -3,14 +3,12 @@ from typing import Annotated, cast
 from fastapi import APIRouter, Depends, status
 
 from app.api.deps import (
-    CacheDep,
     PaginationDep,
     ProjectServiceDep,
     require_project_role,
     require_workspace_role,
 )
 from app.api.responses import RBAC_RESPONSES
-from app.core.cache import invalidate_task_cache
 from app.models.enums import WorkspaceMemberRole
 from app.models.project import Project
 from app.models.workspace import Workspace
@@ -94,12 +92,8 @@ async def update_project(
     response_model=ProjectRead,
     summary="Archive a project",
 )
-async def archive_project(
-    access: ProjectOwner, service: ProjectServiceDep, cache: CacheDep
-) -> Project:
-    project = await service.archive(access)
-    await invalidate_task_cache(cache, access.project.id)
-    return project
+async def archive_project(access: ProjectOwner, service: ProjectServiceDep) -> Project:
+    return await service.archive(access)
 
 
 @router.post(
@@ -107,15 +101,10 @@ async def archive_project(
     response_model=ProjectRead,
     summary="Unarchive a project",
 )
-async def unarchive_project(
-    access: ProjectOwner, service: ProjectServiceDep, cache: CacheDep
-) -> Project:
-    project = await service.unarchive(access)
-    await invalidate_task_cache(cache, access.project.id)
-    return project
+async def unarchive_project(access: ProjectOwner, service: ProjectServiceDep) -> Project:
+    return await service.unarchive(access)
 
 
 @router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_project(access: ProjectOwner, service: ProjectServiceDep, cache: CacheDep) -> None:
+async def delete_project(access: ProjectOwner, service: ProjectServiceDep) -> None:
     await service.delete(access)
-    await invalidate_task_cache(cache, access.project.id)
