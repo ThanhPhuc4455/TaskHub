@@ -4,6 +4,7 @@ from sqlalchemy import func, inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.constants import MAX_PAGE_SIZE
+from app.core.pagination import PageResult, Pagination
 from app.models.base import Base
 
 
@@ -40,14 +41,17 @@ class BaseRepository[ModelT: Base]:
         result = await self.session.scalars(stmt)
         return list(result.all())
 
-    async def get_page(
-        self, *, offset: int = 0, limit: int = MAX_PAGE_SIZE
-    ) -> tuple[list[ModelT], int]:
+    async def get_page(self, pagination: Pagination) -> PageResult[ModelT]:
         primary_key = inspect(self.model).primary_key[0]
         total = int(await self.session.scalar(select(func.count()).select_from(self.model)) or 0)
-        stmt = select(self.model).order_by(primary_key).offset(offset).limit(limit)
+        stmt = (
+            select(self.model)
+            .order_by(primary_key)
+            .offset(pagination.offset)
+            .limit(pagination.limit)
+        )
         result = await self.session.scalars(stmt)
-        return list(result.all()), total
+        return PageResult(items=list(result.all()), total=total)
 
     async def count(self) -> int:
         result = await self.session.scalar(select(func.count()).select_from(self.model))

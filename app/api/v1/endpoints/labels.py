@@ -52,9 +52,9 @@ async def create_label(
 async def list_labels(
     access: ProjectViewer, service: LabelServiceDep, pagination: PaginationDep
 ) -> PageResponse[LabelRead]:
-    items, total = await service.list_labels(access, pagination)
+    result = await service.list_labels(access, pagination)
     return PageResponse.from_result(
-        cast(list[LabelRead], items), total, pagination.page, pagination.limit
+        cast(list[LabelRead], result.items), result.total, pagination.page, pagination.limit
     )
 
 

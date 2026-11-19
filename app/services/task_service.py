@@ -2,14 +2,14 @@ from dataclasses import dataclass
 
 from app.core.exceptions import UnprocessableEntityError
 from app.core.messages import ASSIGNEE_NOT_MEMBER_MESSAGE
-from app.core.pagination import Pagination
+from app.core.pagination import PageResult, Pagination
 from app.models.enums import TaskStatus, WorkspaceMemberRole
 from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.repositories.project_repository import ProjectRepository
-from app.repositories.task_repository import TaskFilters, TaskPage, TaskRepository
+from app.repositories.task_repository import TaskFilters, TaskRepository
 from app.repositories.workspace_member_repository import WorkspaceMemberRepository
 from app.schemas.task import TaskCreate, TaskUpdate
 from app.services.project_policy import ensure_project_active
@@ -67,7 +67,7 @@ class TaskService:
         access: ProjectAccessContext,
         filters: TaskFilters,
         pagination: Pagination,
-    ) -> TaskPage:
+    ) -> PageResult[Task]:
         return await self._tasks.list_by_project(
             access.project.id,
             filters,

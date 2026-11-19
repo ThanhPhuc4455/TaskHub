@@ -28,9 +28,9 @@ async def create_workspace(
 async def list_workspaces(
     service: WorkspaceServiceDep, current_user: CurrentUser, pagination: PaginationDep
 ) -> PageResponse[WorkspaceRead]:
-    items, total = await service.list_for_user(current_user, pagination)
+    result = await service.list_for_user(current_user, pagination)
     return PageResponse.from_result(
-        cast(list[WorkspaceRead], items), total, pagination.page, pagination.limit
+        cast(list[WorkspaceRead], result.items), result.total, pagination.page, pagination.limit
     )
 
 

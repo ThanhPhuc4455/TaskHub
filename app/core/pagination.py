@@ -9,3 +9,9 @@ class Pagination:
     @property
     def offset(self) -> int:
         return (self.page - 1) * self.limit
+
+
+@dataclass(frozen=True)
+class PageResult[T]:
+    items: list[T]
+    total: int
