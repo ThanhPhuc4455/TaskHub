@@ -29,7 +29,10 @@ async def list_members(
 ) -> PageResponse[MemberRead]:
     result = await service.list_members(workspace_id, pagination)
     return PageResponse.from_result(
-        cast(list[MemberRead], result.items), result.total, pagination.page, pagination.limit
+        cast(list[MemberRead], result.items),
+        result.total,
+        pagination.page,
+        pagination.limit,
     )
 
 
