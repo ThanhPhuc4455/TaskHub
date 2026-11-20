@@ -40,6 +40,14 @@ class RedisCacheBackend:
         await self._client.aclose()
 
 
+class TaskCacheInvalidator:
+    def __init__(self, cache: CacheBackend) -> None:
+        self._cache = cache
+
+    async def invalidate(self, project_id: int) -> None:
+        await invalidate_task_cache(self._cache, project_id)
+
+
 def create_redis_client() -> Redis:
     return Redis.from_url(
         settings.redis_url,

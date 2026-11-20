@@ -6,7 +6,7 @@ from fastapi import Depends, Query, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.cache import CacheBackend, RedisCacheBackend
+from app.core.cache import CacheBackend, RedisCacheBackend, TaskCacheInvalidator
 from app.core.config import settings
 from app.core.constants import DEFAULT_PAGE, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from app.core.database import get_db_session
@@ -51,6 +51,13 @@ def get_cache_backend(request: Request) -> CacheBackend:
 CacheDep = Annotated[CacheBackend, Depends(get_cache_backend)]
 
 
+def get_task_cache_invalidator(cache: CacheDep) -> TaskCacheInvalidator:
+    return TaskCacheInvalidator(cache)
+
+
+TaskCacheInvalidatorDep = Annotated[TaskCacheInvalidator, Depends(get_task_cache_invalidator)]
+
+
 def get_workspace_repository(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> WorkspaceRepository:
@@ -77,8 +84,9 @@ def get_workspace_service(
     workspaces: Annotated[WorkspaceRepository, Depends(get_workspace_repository)],
     members: Annotated[WorkspaceMemberRepository, Depends(get_workspace_member_repository)],
     cache: CacheDep,
+    invalidator: TaskCacheInvalidatorDep,
 ) -> WorkspaceService:
-    return WorkspaceService(workspaces, members, cache)
+    return WorkspaceService(workspaces, members, invalidator)
 
 
 WorkspaceServiceDep = Annotated[WorkspaceService, Depends(get_workspace_service)]
@@ -93,9 +101,9 @@ def get_project_repository(
 def get_project_service(
     projects: Annotated[ProjectRepository, Depends(get_project_repository)],
     workspaces: WorkspaceServiceDep,
-    cache: CacheDep,
+    invalidator: TaskCacheInvalidatorDep,
 ) -> ProjectService:
-    return ProjectService(projects, workspaces, cache)
+    return ProjectService(projects, workspaces, invalidator)
 
 
 ProjectServiceDep = Annotated[ProjectService, Depends(get_project_service)]
@@ -124,23 +132,24 @@ def get_task_service(
     projects: Annotated[ProjectRepository, Depends(get_project_repository)],
     members: Annotated[WorkspaceMemberRepository, Depends(get_workspace_member_repository)],
     cache: CacheDep,
+    invalidator: TaskCacheInvalidatorDep,
 ) -> TaskService:
-    return TaskService(tasks, projects, members, cache)
+    return TaskService(tasks, projects, members, cache, invalidator)
 
 
 def get_label_service(
     labels: Annotated[LabelRepository, Depends(get_label_repository)],
     tasks: Annotated[TaskRepository, Depends(get_task_repository)],
-    cache: CacheDep,
+    invalidator: TaskCacheInvalidatorDep,
 ) -> LabelService:
-    return LabelService(labels, tasks, cache)
+    return LabelService(labels, tasks, invalidator)
 
 
 def get_comment_service(
     comments: Annotated[CommentRepository, Depends(get_comment_repository)],
-    cache: CacheDep,
+    invalidator: TaskCacheInvalidatorDep,
 ) -> CommentService:
-    return CommentService(comments, cache)
+    return CommentService(comments, invalidator)
 
 
 TaskServiceDep = Annotated[TaskService, Depends(get_task_service)]
@@ -196,9 +205,9 @@ def get_user_service(
     users: UserRepositoryDep,
     tokens: Annotated[RefreshTokenRepository, Depends(get_refresh_token_repository)],
     tasks: Annotated[TaskRepository, Depends(get_task_repository)],
-    cache: CacheDep,
+    invalidator: TaskCacheInvalidatorDep,
 ) -> UserService:
-    return UserService(users, tokens, tasks, cache)
+    return UserService(users, tokens, tasks, invalidator)
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]

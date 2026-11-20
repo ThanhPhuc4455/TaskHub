@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.exc import IntegrityError
 
-from app.core.cache import CacheBackend, invalidate_task_cache
+from app.core.cache import TaskCacheInvalidator
 from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
 from app.core.messages import (
     LABEL_ALREADY_ATTACHED_MESSAGE,
@@ -32,15 +32,18 @@ class LabelAccessContext:
 
 class LabelService:
     def __init__(
-        self, labels: LabelRepository, tasks: TaskRepository, cache: CacheBackend | None = None
+        self,
+        labels: LabelRepository,
+        tasks: TaskRepository,
+        invalidator: TaskCacheInvalidator | None = None,
     ) -> None:
         self._labels = labels
         self._tasks = tasks
-        self._cache = cache
+        self._invalidator = invalidator
 
     async def _invalidate(self, project_id: int) -> None:
-        if self._cache is not None:
-            await invalidate_task_cache(self._cache, project_id)
+        if self._invalidator is not None:
+            await self._invalidator.invalidate(project_id)
 
     async def create(self, access: ProjectAccessContext, payload: LabelCreate) -> Label:
         ensure_project_active(access.project)

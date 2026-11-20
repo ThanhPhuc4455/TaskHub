@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.core.cache import CacheBackend, invalidate_task_cache
+from app.core.cache import TaskCacheInvalidator
 from app.core.exceptions import ConflictError, NotFoundError
 from app.core.messages import PROJECT_ARCHIVED_MESSAGE
 from app.core.pagination import PageResult, Pagination
@@ -28,15 +28,15 @@ class ProjectService:
         self,
         projects: ProjectRepository,
         workspaces: WorkspaceService,
-        cache: CacheBackend | None = None,
+        invalidator: TaskCacheInvalidator | None = None,
     ) -> None:
         self._projects = projects
         self._workspaces = workspaces
-        self._cache = cache
+        self._invalidator = invalidator
 
     async def _invalidate(self, project_id: int) -> None:
-        if self._cache is not None:
-            await invalidate_task_cache(self._cache, project_id)
+        if self._invalidator is not None:
+            await self._invalidator.invalidate(project_id)
 
     async def create(self, access: Workspace, payload: ProjectCreate) -> Project:
         return await self._projects.create(

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from app.core.cache import (
     CACHE_BACKEND_ERRORS,
     CacheBackend,
-    invalidate_task_cache,
+    TaskCacheInvalidator,
     read_task_cache,
     write_task_cache,
 )
@@ -48,11 +48,13 @@ class TaskService:
         projects: ProjectRepository,
         members: WorkspaceMemberRepository,
         cache: CacheBackend | None = None,
+        invalidator: TaskCacheInvalidator | None = None,
     ) -> None:
         self._tasks = tasks
         self._projects = projects
         self._members = members
         self._cache = cache
+        self._invalidator = invalidator
 
     async def _list_from_database(
         self, access: ProjectAccessContext, filters: TaskFilters, pagination: Pagination
@@ -66,8 +68,8 @@ class TaskService:
         )
 
     async def _invalidate(self, project_id: int) -> None:
-        if self._cache is not None:
-            await invalidate_task_cache(self._cache, project_id)
+        if self._invalidator is not None:
+            await self._invalidator.invalidate(project_id)
 
     async def _check_assignee(self, workspace_id: int, assignee_id: int | None) -> None:
         if (

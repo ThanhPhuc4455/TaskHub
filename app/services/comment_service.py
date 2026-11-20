@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from app.core.cache import CacheBackend, invalidate_task_cache
+from app.core.cache import TaskCacheInvalidator
 from app.core.pagination import PageResult, Pagination
 from app.models.comment import Comment
 from app.models.user import User
@@ -17,13 +17,15 @@ class CommentAccessContext:
 
 
 class CommentService:
-    def __init__(self, comments: CommentRepository, cache: CacheBackend | None = None) -> None:
+    def __init__(
+        self, comments: CommentRepository, invalidator: TaskCacheInvalidator | None = None
+    ) -> None:
         self._comments = comments
-        self._cache = cache
+        self._invalidator = invalidator
 
     async def _invalidate(self, project_id: int) -> None:
-        if self._cache is not None:
-            await invalidate_task_cache(self._cache, project_id)
+        if self._invalidator is not None:
+            await self._invalidator.invalidate(project_id)
 
     async def create(self, task: TaskAccessContext, user: User, payload: CommentCreate) -> Comment:
         ensure_project_active(task.project)
