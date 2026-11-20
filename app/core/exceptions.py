@@ -31,7 +31,11 @@ class BadRequestError(AppException):
     """The request is invalid from a business perspective."""
 
 
+class UnprocessableEntityError(AppException):
+    status_code = 422
+    """The request is well-formed but violates domain validation."""
+
+
 class ForbiddenError(AppException):
     status_code = 403
-
     """The authenticated user lacks permission."""

@@ -104,7 +104,7 @@ async def test_owner_can_archive_project(client: AsyncClient) -> None:
         json={"name": "No longer editable"},
         headers=owner,
     )
-    assert update.status_code == 400
+    assert update.status_code == 409
 
     deleted = await client.delete(f"/api/v1/projects/{project_id}", headers=owner)
     assert deleted.status_code == 204
