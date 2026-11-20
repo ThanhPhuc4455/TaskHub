@@ -79,11 +79,6 @@ class ProjectService:
         await self._invalidate(project.id)
         return project
 
-    async def unarchive(self, access: ProjectAccessContext) -> Project:
-        project = await self._projects.update(access.project, {"status": ProjectStatus.ACTIVE})
-        await self._invalidate(project.id)
-        return project
-
     async def delete(self, access: ProjectAccessContext) -> None:
         await self._projects.delete(access.project)
         await self._invalidate(access.project.id)

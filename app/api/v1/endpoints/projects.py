@@ -96,15 +96,6 @@ async def archive_project(access: ProjectOwner, service: ProjectServiceDep) -> P
     return await service.archive(access)
 
 
-@router.post(
-    "/projects/{project_id}/unarchive",
-    response_model=ProjectRead,
-    summary="Unarchive a project",
-)
-async def unarchive_project(access: ProjectOwner, service: ProjectServiceDep) -> Project:
-    return await service.unarchive(access)
-
-
 @router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(access: ProjectOwner, service: ProjectServiceDep) -> None:
     await service.delete(access)

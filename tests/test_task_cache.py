@@ -254,9 +254,7 @@ async def test_profile_label_and_project_mutations_invalidate_task_cache(
 
     archived = await client.post(f"/api/v1/projects/{project_id}/archive", headers=headers)
     assert archived.status_code == 200
-    unarchived = await client.post(f"/api/v1/projects/{project_id}/unarchive", headers=headers)
-    assert unarchived.status_code == 200
     deleted_project = await client.delete(f"/api/v1/projects/{project_id}", headers=headers)
     assert deleted_project.status_code == 204
 
-    assert fake_cache.increments.count(version_key) == 7
+    assert fake_cache.increments.count(version_key) == 6
