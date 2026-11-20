@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from app.core.cache import TaskCacheInvalidator
 from app.core.exceptions import ConflictError, NotFoundError
 from app.core.messages import PROJECT_ARCHIVED_MESSAGE
 from app.core.pagination import PageResult, Pagination
@@ -23,9 +24,19 @@ class ProjectAccessContext:
 
 
 class ProjectService:
-    def __init__(self, projects: ProjectRepository, workspaces: WorkspaceService) -> None:
+    def __init__(
+        self,
+        projects: ProjectRepository,
+        workspaces: WorkspaceService,
+        invalidator: TaskCacheInvalidator | None = None,
+    ) -> None:
         self._projects = projects
         self._workspaces = workspaces
+        self._invalidator = invalidator
+
+    async def _invalidate(self, project_id: int) -> None:
+        if self._invalidator is not None:
+            await self._invalidator.invalidate(project_id)
 
     async def create(self, access: Workspace, payload: ProjectCreate) -> Project:
         return await self._projects.create(
@@ -64,7 +75,10 @@ class ProjectService:
     async def archive(self, access: ProjectAccessContext) -> Project:
         if access.project.status == ProjectStatus.ARCHIVED:
             raise ConflictError(PROJECT_ARCHIVED_MESSAGE)
-        return await self._projects.update(access.project, {"status": ProjectStatus.ARCHIVED})
+        project = await self._projects.update(access.project, {"status": ProjectStatus.ARCHIVED})
+        await self._invalidate(project.id)
+        return project
 
     async def delete(self, access: ProjectAccessContext) -> None:
         await self._projects.delete(access.project)
+        await self._invalidate(access.project.id)

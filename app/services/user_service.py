@@ -1,19 +1,36 @@
+from app.core.cache import TaskCacheInvalidator
 from app.core.exceptions import BadRequestError
 from app.core.messages import WRONG_PASSWORD_MESSAGE
 from app.core.security import hash_password, verify_password
 from app.models.user import User
 from app.repositories.refresh_token_repository import RefreshTokenRepository
+from app.repositories.task_repository import TaskRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import ChangePasswordRequest, UserUpdate
 
 
 class UserService:
-    def __init__(self, users: UserRepository, tokens: RefreshTokenRepository) -> None:
+    def __init__(
+        self,
+        users: UserRepository,
+        tokens: RefreshTokenRepository,
+        tasks: TaskRepository | None = None,
+        invalidator: TaskCacheInvalidator | None = None,
+    ) -> None:
         self._users = users
         self._tokens = tokens
+        self._tasks = tasks
+        self._invalidator = invalidator
 
     async def update_profile(self, user: User, payload: UserUpdate) -> User:
-        return await self._users.update(user, payload.model_dump(exclude_unset=True))
+        project_ids = (
+            await self._tasks.project_ids_by_assignee(user.id) if self._tasks is not None else []
+        )
+        updated = await self._users.update(user, payload.model_dump(exclude_unset=True))
+        if self._invalidator is not None:
+            for project_id in project_ids:
+                await self._invalidator.invalidate(project_id)
+        return updated
 
     async def change_password(self, user: User, payload: ChangePasswordRequest) -> None:
         if not await verify_password(payload.current_password, user.hashed_password):

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.api.deps import AuthServiceDep
+from app.api.responses import AUTH_RESPONSES, PUBLIC_REGISTER_RESPONSES
 from app.models.user import User
 from app.schemas.auth import RefreshRequest, RegisterRequest, TokenResponse
 from app.schemas.user import UserRead
@@ -11,12 +12,17 @@ from app.schemas.user import UserRead
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    response_model=UserRead,
+    status_code=status.HTTP_201_CREATED,
+    responses=PUBLIC_REGISTER_RESPONSES,
+)
 async def register(payload: RegisterRequest, service: AuthServiceDep) -> User:
     return await service.register(payload)
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, responses=AUTH_RESPONSES)
 async def login(
     form: Annotated[OAuth2PasswordRequestForm, Depends()], service: AuthServiceDep
 ) -> TokenResponse:
@@ -27,7 +33,7 @@ async def login(
     "/refresh",
     response_model=TokenResponse,
     summary="Rotate a refresh token",
-    responses={401: {"description": "Invalid, expired, or revoked refresh token"}},
+    responses=AUTH_RESPONSES,
 )
 async def refresh(payload: RefreshRequest, service: AuthServiceDep) -> TokenResponse:
     return await service.refresh(payload.refresh_token)
@@ -37,7 +43,7 @@ async def refresh(payload: RefreshRequest, service: AuthServiceDep) -> TokenResp
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Revoke a refresh token",
-    responses={401: {"description": "Invalid, expired, or unknown refresh token"}},
+    responses=AUTH_RESPONSES,
 )
 async def logout(payload: RefreshRequest, service: AuthServiceDep) -> None:
     await service.logout(payload.refresh_token)
