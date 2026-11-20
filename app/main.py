@@ -22,6 +22,7 @@ from app.core.constants import (
 )
 from app.core.database import AsyncSessionLocal, engine
 from app.core.exceptions import AppException
+from app.core.logging import configure_logging
 from app.core.messages import INTERNAL_SERVER_ERROR_MESSAGE
 from app.core.middleware import RequestLoggingMiddleware
 from app.repositories.refresh_token_repository import RefreshTokenRepository
@@ -43,6 +44,7 @@ async def _cleanup_refresh_tokens_periodically() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    configure_logging(settings)
     redis_client = create_redis_client()
     app.state.redis_client = redis_client
     try:

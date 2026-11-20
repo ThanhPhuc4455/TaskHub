@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     app_env: Literal["development", "test", "production"] = "development"
     debug: bool = Field(default=False, validation_alias=AliasChoices("TASKHUB_DEBUG"))
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
     database_url: str
     db_echo: bool = False

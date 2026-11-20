@@ -14,6 +14,11 @@ def test_invalid_app_env_is_rejected() -> None:
         Settings(database_url="sqlite+aiosqlite://", secret_key="test", app_env="staging")
 
 
+def test_invalid_log_level_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        Settings(database_url="sqlite+aiosqlite://", secret_key="test", log_level="TRACE")
+
+
 def test_production_requires_strong_secret_key(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(ValidationError):
         Settings(database_url="sqlite+aiosqlite://", app_env="production", secret_key="short")
