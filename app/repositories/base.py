@@ -11,10 +11,22 @@ class BaseRepository[ModelT: Base]:
         self.session = session
         self.model = model
 
-    async def create(self, **data: Any) -> ModelT:
+    async def commit(self) -> None:
+        await self.session.commit()
+
+    async def rollback(self) -> None:
+        await self.session.rollback()
+
+    async def _flush_or_commit(self, commit: bool) -> None:
+        if commit:
+            await self.session.commit()
+        else:
+            await self.session.flush()
+
+    async def create(self, *, commit: bool = True, **data: Any) -> ModelT:
         obj = self.model(**data)
         self.session.add(obj)
-        await self.session.commit()
+        await self._flush_or_commit(commit)
         await self.session.refresh(obj)
         return obj
 
@@ -31,13 +43,13 @@ class BaseRepository[ModelT: Base]:
         result = await self.session.scalar(select(func.count()).select_from(self.model))
         return result or 0
 
-    async def update(self, obj: ModelT, data: dict[str, Any]) -> ModelT:
+    async def update(self, obj: ModelT, data: dict[str, Any], *, commit: bool = True) -> ModelT:
         for key, value in data.items():
             setattr(obj, key, value)
-        await self.session.commit()
+        await self._flush_or_commit(commit)
         await self.session.refresh(obj)
         return obj
 
-    async def delete(self, obj: ModelT) -> None:
+    async def delete(self, obj: ModelT, *, commit: bool = True) -> None:
         await self.session.delete(obj)
-        await self.session.commit()
+        await self._flush_or_commit(commit)

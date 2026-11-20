@@ -5,6 +5,7 @@ import jwt
 from httpx import AsyncClient
 
 from app.core.config import settings
+from app.core.security import create_refresh_token
 
 AUTH = "/api/v1/auth"
 USER = {"email": "a@example.com", "password": "password123", "full_name": "A"}
@@ -68,6 +69,35 @@ async def test_refresh_and_token_type_check(client: AsyncClient) -> None:
     assert ok.status_code == 200
     bad = await client.post(f"{AUTH}/refresh", json={"refresh_token": tokens["access_token"]})
     assert bad.status_code == 401
+
+
+async def test_logout_revokes_refresh_token(client: AsyncClient) -> None:
+    await client.post(f"{AUTH}/register", json=USER)
+    tokens = await login(client, USER["email"], USER["password"])
+    body = {"refresh_token": tokens["refresh_token"]}
+
+    assert (await client.post(f"{AUTH}/logout", json=body)).status_code == 204
+    assert (await client.post(f"{AUTH}/refresh", json=body)).status_code == 401
+    assert (await client.post(f"{AUTH}/logout", json=body)).status_code == 204
+
+
+async def test_logout_unknown_refresh_token_returns_401(client: AsyncClient) -> None:
+    token = create_refresh_token(999)
+    response = await client.post(f"{AUTH}/logout", json={"refresh_token": token.token})
+    assert response.status_code == 401
+
+
+async def test_refresh_token_is_rotated(client: AsyncClient) -> None:
+    await client.post(f"{AUTH}/register", json=USER)
+    tokens = await login(client, USER["email"], USER["password"])
+    old = {"refresh_token": tokens["refresh_token"]}
+
+    first = await client.post(f"{AUTH}/refresh", json=old)
+    assert first.status_code == 200
+    assert (await client.post(f"{AUTH}/refresh", json=old)).status_code == 401
+
+    new = {"refresh_token": first.json()["refresh_token"]}
+    assert (await client.post(f"{AUTH}/refresh", json=new)).status_code == 401
 
 
 async def test_signed_access_token_with_non_numeric_sub_returns_401(
