@@ -16,7 +16,7 @@ from app.models.task import Task
 from app.repositories.task_repository import TaskFilters
 from app.schemas.page import PageResponse
 from app.schemas.task import TaskCreate, TaskRead, TaskUpdate
-from app.services.notification_service import notify_task_assigned_safely
+from app.services.notification_service import queue_assignment_notification
 from app.services.project_service import ProjectAccessContext
 from app.services.task_service import TaskAccessContext
 
@@ -55,8 +55,8 @@ async def create_task(
 ) -> Task:
     result = await service.create(access, current_user, payload)
     if result.should_notify_assignee and result.task.assignee is not None:
-        background_tasks.add_task(
-            notify_task_assigned_safely,
+        queue_assignment_notification(
+            background_tasks,
             notification,
             recipient_email=result.task.assignee.email,
             task_title=result.task.title,
@@ -95,8 +95,8 @@ async def update_task(
 ) -> Task:
     result = await service.update(access, current_user, payload)
     if result.should_notify_assignee and result.task.assignee is not None:
-        background_tasks.add_task(
-            notify_task_assigned_safely,
+        queue_assignment_notification(
+            background_tasks,
             notification,
             recipient_email=result.task.assignee.email,
             task_title=result.task.title,

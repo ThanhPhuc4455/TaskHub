@@ -1,6 +1,8 @@
 import logging
 from typing import Protocol
 
+from fastapi import BackgroundTasks
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,3 +51,22 @@ async def notify_task_assigned_safely(
         )
     except Exception:
         logger.exception("Task assignment notification failed")
+
+
+def queue_assignment_notification(
+    background_tasks: BackgroundTasks,
+    notification: NotificationService,
+    *,
+    recipient_email: str,
+    task_title: str,
+    project_name: str,
+    assigner_name: str,
+) -> None:
+    background_tasks.add_task(
+        notify_task_assigned_safely,
+        notification,
+        recipient_email=recipient_email,
+        task_title=task_title,
+        project_name=project_name,
+        assigner_name=assigner_name,
+    )
