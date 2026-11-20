@@ -1,12 +1,17 @@
 from sqlalchemy.exc import IntegrityError
 
 from app.core.exceptions import BadRequestError, ConflictError, NotFoundError
-from app.core.messages import ALREADY_MEMBER_MESSAGE, CANNOT_REMOVE_OWNER_MESSAGE
+from app.core.messages import (
+    ALREADY_MEMBER_MESSAGE,
+    CANNOT_CHANGE_OWNER_ROLE_MESSAGE,
+    CANNOT_REMOVE_OWNER_MESSAGE,
+)
+from app.core.pagination import PageResult, Pagination
 from app.models.workspace import Workspace
 from app.models.workspace_member import WorkspaceMember
 from app.repositories.user_repository import UserRepository
 from app.repositories.workspace_member_repository import WorkspaceMemberRepository
-from app.schemas.member import InviteMemberRequest
+from app.schemas.member import InviteMemberRequest, UpdateMemberRoleRequest
 from app.services.workspace_service import WorkspaceService
 
 
@@ -21,8 +26,10 @@ class MemberService:
         self._members = members
         self._users = users
 
-    async def list_members(self, workspace_id: int) -> list[WorkspaceMember]:
-        return await self._members.list_by_workspace(workspace_id)
+    async def list_members(
+        self, workspace_id: int, pagination: Pagination
+    ) -> PageResult[WorkspaceMember]:
+        return await self._members.list_by_workspace(workspace_id, pagination)
 
     async def invite(self, workspace_id: int, payload: InviteMemberRequest) -> WorkspaceMember:
         invitee = await self._users.get_by_email(payload.email.lower())
@@ -47,3 +54,16 @@ class MemberService:
         if membership is None:
             raise NotFoundError("Member", target_user_id)
         await self._members.delete(membership)
+
+    async def update_role(
+        self,
+        workspace: Workspace,
+        target_user_id: int,
+        payload: UpdateMemberRoleRequest,
+    ) -> WorkspaceMember:
+        if target_user_id == workspace.owner_id:
+            raise BadRequestError(CANNOT_CHANGE_OWNER_ROLE_MESSAGE)
+        membership = await self._members.get_membership(workspace.id, target_user_id)
+        if membership is None:
+            raise NotFoundError("Member", target_user_id)
+        return await self._members.update(membership, {"role": payload.role})
