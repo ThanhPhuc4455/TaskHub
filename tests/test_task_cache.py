@@ -6,6 +6,7 @@ from httpx import AsyncClient
 
 from app.api.deps import get_cache_backend
 from app.core.cache import task_cache_data_key, task_cache_version_key
+from app.core.config import settings
 from app.core.pagination import PageResult, Pagination
 from app.main import app as fastapi_app
 from app.models.enums import TaskPriority, TaskStatus
@@ -126,7 +127,7 @@ async def test_task_cache_hit_avoids_second_repository_query(
     assert first.json() == second.json()
     assert calls == 1
     assert fake_cache.ttls
-    assert set(fake_cache.ttls.values()) == {120}
+    assert set(fake_cache.ttls.values()) == {settings.cache_ttl_seconds}
 
 
 async def test_task_cache_failure_falls_back_to_database(

@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.constants import (
@@ -18,7 +19,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
     redis_url: str = "redis://127.0.0.1:6379/0"
-    cache_ttl_seconds: int = 120
+    cache_ttl_seconds: int = Field(default=120, gt=0)
     redis_socket_connect_timeout: float = REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS
     redis_socket_timeout: float = REDIS_SOCKET_TIMEOUT_SECONDS
 
