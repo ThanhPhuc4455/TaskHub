@@ -141,13 +141,46 @@ async def test_task_reassignment_notifies_only_for_new_assignee(
         json={"assignee_id": second_assignee_id},
         headers=owner,
     )
+    self_assigned = await client.patch(
+        f"/api/v1/tasks/{task.json()['id']}",
+        json={"assignee_id": await user_id_of(client, owner)},
+        headers=owner,
+    )
     unassigned = await client.patch(
         f"/api/v1/tasks/{task.json()['id']}", json={"assignee_id": None}, headers=owner
     )
 
-    assert same.status_code == changed.status_code == unassigned.status_code == 200
+    assert (
+        same.status_code
+        == changed.status_code
+        == self_assigned.status_code
+        == unassigned.status_code
+        == 200
+    )
     assert len(notification_service.calls) == 1
     assert notification_service.calls[0]["recipient_email"] == "notification-second@example.com"
+
+
+async def test_update_task_does_not_notify_when_assigning_to_current_user(
+    client: AsyncClient, notification_service: FakeNotificationService
+) -> None:
+    owner, _, project_id, assignee_id = await setup_project(client)
+    task = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "Self assign on update", "assignee_id": assignee_id},
+        headers=owner,
+    )
+    assert task.status_code == 201
+    notification_service.calls.clear()
+
+    response = await client.patch(
+        f"/api/v1/tasks/{task.json()['id']}",
+        json={"assignee_id": await user_id_of(client, owner)},
+        headers=owner,
+    )
+
+    assert response.status_code == 200
+    assert notification_service.calls == []
 
 
 async def test_notification_failure_does_not_fail_task_creation(
