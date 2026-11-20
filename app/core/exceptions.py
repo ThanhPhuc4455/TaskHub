@@ -1,17 +1,27 @@
+from enum import StrEnum
 from typing import ClassVar
 
-from app.core.constants import APP_ERROR_CODE
 from app.core.messages import NOT_FOUND_MESSAGE
+
+
+class ErrorCode(StrEnum):
+    APPLICATION_ERROR = "application_error"
+    NOT_FOUND = "not_found"
+    CONFLICT = "conflict"
+    AUTHENTICATION = "authentication_error"
+    BAD_REQUEST = "bad_request"
+    UNPROCESSABLE_ENTITY = "unprocessable_entity"
+    FORBIDDEN = "forbidden"
 
 
 class AppException(Exception):
     status_code: ClassVar[int] = 500
-    code: ClassVar[str] = APP_ERROR_CODE
+    code: ClassVar[str] = ErrorCode.APPLICATION_ERROR
 
 
 class NotFoundError(AppException):
     status_code = 404
-    code = "not_found"
+    code = ErrorCode.NOT_FOUND
 
     def __init__(self, resource: str, resource_id: int | str) -> None:
         self.resource = resource
@@ -21,29 +31,29 @@ class NotFoundError(AppException):
 
 class ConflictError(AppException):
     status_code = 409
-    code = "conflict"
+    code = ErrorCode.CONFLICT
     """Data conflicts with an existing resource."""
 
 
 class AuthenticationError(AppException):
     status_code = 401
-    code = "authentication_error"
+    code = ErrorCode.AUTHENTICATION
     """Authentication failed or a token is invalid."""
 
 
 class BadRequestError(AppException):
     status_code = 400
-    code = "bad_request"
+    code = ErrorCode.BAD_REQUEST
     """The request is invalid from a business perspective."""
 
 
 class UnprocessableEntityError(AppException):
     status_code = 422
-    code = "unprocessable_entity"
+    code = ErrorCode.UNPROCESSABLE_ENTITY
     """The request is well-formed but violates domain validation."""
 
 
 class ForbiddenError(AppException):
     status_code = 403
-    code = "forbidden"
+    code = ErrorCode.FORBIDDEN
     """The authenticated user lacks permission."""
