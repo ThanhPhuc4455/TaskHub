@@ -259,3 +259,28 @@ async def test_profile_label_and_project_mutations_invalidate_task_cache(
     assert deleted_project.status_code == 204
 
     assert fake_cache.increments.count(version_key) == 6
+
+
+async def test_workspace_delete_invalidates_each_project_cache(
+    client: AsyncClient, fake_cache: FakeCache
+) -> None:
+    headers = await login_as(client, "cache-workspace-delete@example.com")
+    workspace = await client.post(
+        "/api/v1/workspaces", json={"name": "Workspace delete cache"}, headers=headers
+    )
+    assert workspace.status_code == 201
+    workspace_id = workspace.json()["id"]
+    project = await client.post(
+        f"/api/v1/workspaces/{workspace_id}/projects",
+        json={"name": "Workspace delete project"},
+        headers=headers,
+    )
+    assert project.status_code == 201
+    project_id = project.json()["id"]
+    version_key = task_cache_version_key(project_id)
+    fake_cache.increments.clear()
+
+    deleted = await client.delete(f"/api/v1/workspaces/{workspace_id}", headers=headers)
+
+    assert deleted.status_code == 204
+    assert fake_cache.increments.count(version_key) == 1
