@@ -39,16 +39,14 @@ replace them locally and never commit `.env`.
 |---|---:|---|---|
 | `APP_ENV` | no | `development` | `development` |
 | `LOG_LEVEL` | no | `INFO` | `INFO` |
-| `DATABASE_URL` | yes | — | `postgresql+asyncpg://taskhub:password@db:5432/taskhub` |
+| `DATABASE_URL` | Local only | — | `postgresql+asyncpg://taskhub:password@127.0.0.1:5432/taskhub` |
 | `SECRET_KEY` | yes | — | `a-long-local-secret` |
 | `DB_ECHO` | no | `false` | `false` |
-| `REDIS_URL` | no | `redis://127.0.0.1:6379/0` | `redis://redis:6379/0` |
+| `REDIS_URL` | no | `redis://127.0.0.1:6379/0` | `redis://127.0.0.1:6379/0` |
 | `CACHE_TTL_SECONDS` | no | `120` | `120` |
 | `REDIS_SOCKET_CONNECT_TIMEOUT` | no | `1.0` | `1.0` |
 | `REDIS_SOCKET_TIMEOUT` | no | `1.0` | `1.0` |
 | `APP_PORT` | Compose only | `8001` | `8001` |
-| `POSTGRES_PORT` | Compose only | `5435` | `5435` |
-| `REDIS_PORT` | Compose only | `6380` | `6380` |
 | `POSTGRES_DB` | Compose only | — | `taskhub` |
 | `POSTGRES_USER` | Compose only | — | `taskhub` |
 | `POSTGRES_PASSWORD` | Compose only | — | local password |
@@ -87,6 +85,8 @@ The Compose app runs by default with `APP_ENV=production` (requiring a non-defau
 `SECRET_KEY` of at least 32 characters). To run Compose in development mode, override
 `APP_ENV` in your environment (for example, `$env:APP_ENV = "development"`).
 
+Compose automatically constructs `DATABASE_URL` from `POSTGRES_USER`,
+`POSTGRES_PASSWORD`, and `POSTGRES_DB`, and sets `REDIS_URL` to internal service `redis://redis:6379/0`.
 The Compose app waits for healthy PostgreSQL and Redis, runs `alembic upgrade head`,
 then starts Uvicorn. Only the application port (`8001`) and Mailpit web interface
 (`8025`) are published to the host; PostgreSQL and Redis communicate internally
