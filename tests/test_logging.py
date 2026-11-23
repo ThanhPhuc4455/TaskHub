@@ -86,3 +86,42 @@ def test_uvicorn_loggers_configured_with_console_handler_and_filter() -> None:
         assert any(isinstance(h.formatter, RequestContextFormatter) for h in logger.handlers), (
             f"{name} logger should have RequestContextFormatter"
         )
+
+
+def test_configure_logging_selects_expected_formatter_for_environment() -> None:
+    from app.core.config import Settings
+    from app.core.logging import DEVELOPMENT_FORMAT, PRODUCTION_FORMAT, configure_logging
+
+    token = request_id_context.set("test-req")
+    try:
+        dev_settings = Settings(app_env="development")
+        configure_logging(dev_settings)
+        dev_handler = logging.getLogger().handlers[0]
+        assert getattr(dev_handler.formatter, "_fmt", None) == DEVELOPMENT_FORMAT
+
+        record = logging.LogRecord(
+            "test.dev",
+            logging.INFO,
+            "test.py",
+            1,
+            "test message",
+            (),
+            None,
+        )
+        dev_handler.filter(record)
+        formatted_dev = dev_handler.format(record)
+        assert "request_id=test-req test.dev: test message" in formatted_dev
+        assert "level=INFO" not in formatted_dev
+
+        prod_settings = Settings(app_env="production", secret_key="a" * 32)
+        configure_logging(prod_settings)
+        prod_handler = logging.getLogger().handlers[0]
+        assert getattr(prod_handler.formatter, "_fmt", None) == PRODUCTION_FORMAT
+
+        prod_handler.filter(record)
+        formatted_prod = prod_handler.format(record)
+        expected_prod_msg = "level=INFO request_id=test-req logger=test.dev message=test message"
+        assert expected_prod_msg in formatted_prod
+        assert "test.dev: test message" not in formatted_prod
+    finally:
+        request_id_context.reset(token)
