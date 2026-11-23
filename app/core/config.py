@@ -6,12 +6,17 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.core.constants import (
     REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS,
     REDIS_SOCKET_TIMEOUT_SECONDS,
+    SECRET_KEY_BLOCKLIST,
+    SECRET_KEY_MIN_LENGTH,
     SMTP_PORT_DEFAULT,
     SMTP_PORT_MAX,
     SMTP_PORT_MIN,
     SMTP_TIMEOUT_SECONDS,
 )
-from app.core.messages import SMTP_CONFIGURATION_REQUIRED_MESSAGE
+from app.core.messages import (
+    PRODUCTION_SECRET_KEY_MESSAGE,
+    SMTP_CONFIGURATION_REQUIRED_MESSAGE,
+)
 
 
 class Settings(BaseSettings):
@@ -45,10 +50,9 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
         if self.app_env == "production" and (
-            len(self.secret_key) < 32
-            or self.secret_key in {"change-me", "changeme", "secret", "your-secret-key"}
+            len(self.secret_key) < SECRET_KEY_MIN_LENGTH or self.secret_key in SECRET_KEY_BLOCKLIST
         ):
-            raise ValueError("production SECRET_KEY must be at least 32 characters and non-default")
+            raise ValueError(PRODUCTION_SECRET_KEY_MESSAGE)
         return self
 
     @model_validator(mode="after")

@@ -28,6 +28,24 @@ def test_production_requires_strong_secret_key(monkeypatch: pytest.MonkeyPatch) 
         Settings(database_url="sqlite+aiosqlite://", app_env="production", _env_file=None)
 
 
+def test_production_rejects_blocklisted_default_secret_key() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            database_url="sqlite+aiosqlite://",
+            app_env="production",
+            secret_key="replace-with-a-local-secret-32-chars",
+        )
+
+
+def test_production_accepts_strong_non_default_secret_key() -> None:
+    settings = Settings(
+        database_url="sqlite+aiosqlite://",
+        app_env="production",
+        secret_key="a" * 32,
+    )
+    assert settings.secret_key == "a" * 32
+
+
 def test_development_settings_are_valid() -> None:
     settings = Settings(database_url="sqlite+aiosqlite://", secret_key="test")
     assert settings.app_env == "development"
