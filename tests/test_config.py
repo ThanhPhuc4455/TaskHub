@@ -32,3 +32,29 @@ def test_development_settings_are_valid() -> None:
     settings = Settings(database_url="sqlite+aiosqlite://", secret_key="test")
     assert settings.app_env == "development"
     assert settings.debug is False
+
+
+def test_enabled_smtp_requires_host_and_from_address() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            database_url="sqlite+aiosqlite://",
+            secret_key="test",
+            smtp_enabled=True,
+            smtp_from_address="taskhub@example.local",
+        )
+
+
+def test_smtp_timeout_must_be_positive() -> None:
+    with pytest.raises(ValidationError):
+        Settings(database_url="sqlite+aiosqlite://", secret_key="test", smtp_timeout_seconds=0)
+
+
+def test_smtp_port_must_be_valid() -> None:
+    for port in (0, 65536):
+        with pytest.raises(ValidationError):
+            Settings(database_url="sqlite+aiosqlite://", secret_key="test", smtp_port=port)
+
+
+def test_disabled_smtp_does_not_require_configuration() -> None:
+    settings = Settings(database_url="sqlite+aiosqlite://", secret_key="test")
+    assert settings.smtp_enabled is False

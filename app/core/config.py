@@ -1,12 +1,17 @@
 from typing import Literal
 
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.constants import (
     REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS,
     REDIS_SOCKET_TIMEOUT_SECONDS,
+    SMTP_PORT_DEFAULT,
+    SMTP_PORT_MAX,
+    SMTP_PORT_MIN,
+    SMTP_TIMEOUT_SECONDS,
 )
+from app.core.messages import SMTP_CONFIGURATION_REQUIRED_MESSAGE
 
 
 class Settings(BaseSettings):
@@ -27,6 +32,15 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = Field(default=120, gt=0)
     redis_socket_connect_timeout: float = REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS
     redis_socket_timeout: float = REDIS_SOCKET_TIMEOUT_SECONDS
+    smtp_host: str | None = None
+    smtp_port: int = Field(default=SMTP_PORT_DEFAULT, ge=SMTP_PORT_MIN, le=SMTP_PORT_MAX)
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_use_tls: bool = False
+    smtp_start_tls: bool = False
+    smtp_timeout_seconds: float = Field(default=SMTP_TIMEOUT_SECONDS, gt=0)
+    smtp_from_address: str | None = None
+    smtp_enabled: bool = False
 
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
@@ -35,6 +49,12 @@ class Settings(BaseSettings):
             or self.secret_key in {"change-me", "changeme", "secret", "your-secret-key"}
         ):
             raise ValueError("production SECRET_KEY must be at least 32 characters and non-default")
+        return self
+
+    @model_validator(mode="after")
+    def validate_smtp_configuration(self) -> "Settings":
+        if self.smtp_enabled and (not self.smtp_host or not self.smtp_from_address):
+            raise ValueError(SMTP_CONFIGURATION_REQUIRED_MESSAGE)
         return self
 
     model_config = SettingsConfigDict(
