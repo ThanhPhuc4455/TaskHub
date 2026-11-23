@@ -1,0 +1,309 @@
+from datetime import UTC, datetime, timedelta
+
+from httpx import AsyncClient
+from sqlalchemy import select
+
+from app.main import app as fastapi_app
+from app.models.user import User, UserRole
+from tests.helpers import login_as
+
+WS = "/api/v1/workspaces"
+
+
+async def project_for(client: AsyncClient, headers: dict[str, str], name: str = "Workspace") -> int:
+    workspace = await client.post(WS, json={"name": name}, headers=headers)
+    assert workspace.status_code == 201
+    workspace_id = workspace.json()["id"]
+    project = await client.post(
+        f"{WS}/{workspace_id}/projects", json={"name": "Project"}, headers=headers
+    )
+    assert project.status_code == 201
+    return int(project.json()["id"])
+
+
+async def test_task_crud_filters_and_pagination(client: AsyncClient) -> None:
+    owner = await login_as(client, "task-owner@example.com")
+    project_id = await project_for(client, owner)
+
+    first = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "First", "priority": "HIGH"},
+        headers=owner,
+    )
+    second = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "Second"},
+        headers=owner,
+    )
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["labels"] == []
+    task_id = first.json()["id"]
+
+    listed = await client.get(
+        f"/api/v1/projects/{project_id}/tasks?priority=HIGH&page=1&limit=1",
+        headers=owner,
+    )
+    assert listed.status_code == 200
+    assert listed.json()["total"] == 1
+    assert listed.json()["items"][0]["id"] == task_id
+
+    multi_filter = await client.get(
+        f"/api/v1/projects/{project_id}/tasks?priority=HIGH&priority=MEDIUM",
+        headers=owner,
+    )
+    assert multi_filter.status_code == 200
+    assert multi_filter.json()["total"] == 2
+
+    empty_filter = await client.get(
+        f"/api/v1/projects/{project_id}/tasks?status=IN_REVIEW",
+        headers=owner,
+    )
+    assert empty_filter.status_code == 200
+    assert empty_filter.json()["total"] == 0
+
+    invalid_filter = await client.get(
+        f"/api/v1/projects/{project_id}/tasks?status=NOT_A_STATUS",
+        headers=owner,
+    )
+    assert invalid_filter.status_code == 422
+
+    updated = await client.patch(
+        f"/api/v1/tasks/{task_id}",
+        json={"description": None, "status": "IN_PROGRESS"},
+        headers=owner,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["status"] == "IN_PROGRESS"
+
+
+async def test_task_create_validation(client: AsyncClient) -> None:
+    owner = await login_as(client, "task-validation@example.com")
+    project_id = await project_for(client, owner, "Validation workspace")
+
+    for payload in (
+        {"title": "Naive", "due_date": "2099-01-01T00:00:00"},
+        {"title": "Past", "due_date": "2000-01-01T00:00:00Z"},
+        {"title": "Bad assignee", "assignee_id": 0},
+        {"title": "Negative assignee", "assignee_id": -1},
+        {"title": "Client status", "status": "DONE"},
+    ):
+        response = await client.post(
+            f"/api/v1/projects/{project_id}/tasks", json=payload, headers=owner
+        )
+        assert response.status_code == 422
+
+    future = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={
+            "title": "Future",
+            "due_date": (datetime.now(UTC) + timedelta(days=1)).isoformat(),
+        },
+        headers=owner,
+    )
+    assert future.status_code == 201
+    assert future.json()["status"] == "TODO"
+
+
+async def test_task_patch_rejects_naive_due_date(client: AsyncClient) -> None:
+    owner = await login_as(client, "task-patch-due-date@example.com")
+    project_id = await project_for(client, owner, "Patch due date workspace")
+    created = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "Patch due date"},
+        headers=owner,
+    )
+    assert created.status_code == 201
+
+    naive_future = (datetime.now(UTC) + timedelta(days=1)).replace(tzinfo=None).isoformat()
+    response = await client.patch(
+        f"/api/v1/tasks/{created.json()['id']}",
+        json={"due_date": naive_future},
+        headers=owner,
+    )
+
+    assert response.status_code == 422
+
+
+async def test_task_rbac_assignee_and_archived_project(client: AsyncClient) -> None:
+    owner = await login_as(client, "task-owner-2@example.com")
+    viewer = await login_as(client, "task-viewer@example.com")
+    project_id = await project_for(client, owner, "RBAC workspace")
+
+    workspace_id = (await client.get(f"/api/v1/projects/{project_id}", headers=owner)).json()[
+        "workspace_id"
+    ]
+    invited = await client.post(
+        f"{WS}/{workspace_id}/members",
+        json={"email": "task-viewer@example.com", "role": "VIEWER"},
+        headers=owner,
+    )
+    assert invited.status_code == 201
+
+    forbidden = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "No"},
+        headers=viewer,
+    )
+    assert forbidden.status_code == 403
+
+    bad_assignee = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "Bad assignee", "assignee_id": 999999},
+        headers=owner,
+    )
+    assert bad_assignee.status_code == 422
+    assert "workspace member" in bad_assignee.json()["detail"]
+
+    archived = await client.post(f"/api/v1/projects/{project_id}/archive", headers=owner)
+    assert archived.status_code == 200
+    blocked = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "Blocked"},
+        headers=owner,
+    )
+    viewer_blocked = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "Viewer blocked"},
+        headers=viewer,
+    )
+    assert viewer_blocked.status_code == 403
+    assert blocked.status_code == 409
+
+
+async def test_labels_and_comments_enforce_project_and_comment_rules(
+    client: AsyncClient,
+) -> None:
+    owner = await login_as(client, "content-owner@example.com")
+    editor = await login_as(client, "content-editor@example.com")
+    project_id = await project_for(client, owner, "Content workspace")
+    project = await client.get(f"/api/v1/projects/{project_id}", headers=owner)
+    workspace_id = project.json()["workspace_id"]
+    invited = await client.post(
+        f"{WS}/{workspace_id}/members",
+        json={"email": "content-editor@example.com", "role": "EDITOR"},
+        headers=owner,
+    )
+    assert invited.status_code == 201
+
+    task = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "Commented task"},
+        headers=editor,
+    )
+    assert task.status_code == 201
+    task_id = task.json()["id"]
+    label = await client.post(
+        f"/api/v1/projects/{project_id}/labels",
+        json={"name": "backend", "color": "#12abef"},
+        headers=editor,
+    )
+    assert label.status_code == 201
+    label_id = label.json()["id"]
+    assert (
+        await client.post(f"/api/v1/tasks/{task_id}/labels/{label_id}", headers=editor)
+    ).status_code == 204
+    duplicate = await client.post(f"/api/v1/tasks/{task_id}/labels/{label_id}", headers=editor)
+    assert duplicate.status_code == 409
+
+    comment = await client.post(
+        f"/api/v1/tasks/{task_id}/comments",
+        json={"content": "Looks good"},
+        headers=editor,
+    )
+    assert comment.status_code == 201
+    comment_id = comment.json()["id"]
+    assert comment.json()["author"]["email"] == "content-editor@example.com"
+
+    other = await login_as(client, "content-other@example.com")
+    denied = await client.delete(f"/api/v1/tasks/{task_id}/comments/{comment_id}", headers=other)
+    assert denied.status_code == 404
+    deleted = await client.delete(f"/api/v1/tasks/{task_id}/comments/{comment_id}", headers=editor)
+    assert deleted.status_code == 204
+
+
+async def test_day5_permission_matrix(client: AsyncClient) -> None:
+    owner = await login_as(client, "matrix-owner@example.com")
+    editor = await login_as(client, "matrix-editor@example.com")
+    other_editor = await login_as(client, "matrix-other-editor@example.com")
+    viewer = await login_as(client, "matrix-viewer@example.com")
+    admin = await login_as(client, "matrix-admin@example.com")
+    project_id = await project_for(client, owner, "Matrix workspace")
+    workspace_id = (await client.get(f"/api/v1/projects/{project_id}", headers=owner)).json()[
+        "workspace_id"
+    ]
+
+    for email, role in (
+        ("matrix-editor@example.com", "EDITOR"),
+        ("matrix-other-editor@example.com", "EDITOR"),
+        ("matrix-viewer@example.com", "VIEWER"),
+    ):
+        response = await client.post(
+            f"{WS}/{workspace_id}/members",
+            json={"email": email, "role": role},
+            headers=owner,
+        )
+        assert response.status_code == 201
+
+    async with fastapi_app.state.test_sessionmaker() as session:
+        user = await session.scalar(select(User).where(User.email == "matrix-admin@example.com"))
+        assert user is not None
+        user.role = UserRole.ADMIN
+        await session.commit()
+
+    task = await client.post(
+        f"/api/v1/projects/{project_id}/tasks", json={"title": "Matrix task"}, headers=owner
+    )
+    assert task.status_code == 201
+    task_id = task.json()["id"]
+    label = await client.post(
+        f"/api/v1/projects/{project_id}/labels",
+        json={"name": "matrix", "color": "#123456"},
+        headers=owner,
+    )
+    assert label.status_code == 201
+    label_id = label.json()["id"]
+
+    assert (
+        await client.post(
+            f"/api/v1/projects/{project_id}/labels",
+            json={"name": "viewer", "color": "#123456"},
+            headers=viewer,
+        )
+    ).status_code == 403
+    assert (
+        await client.post(
+            f"/api/v1/tasks/{task_id}/comments",
+            json={"content": "viewer"},
+            headers=viewer,
+        )
+    ).status_code == 403
+    assert (
+        await client.delete(f"/api/v1/tasks/{task_id}/labels/{label_id}", headers=editor)
+    ).status_code == 404
+
+    comment = await client.post(
+        f"/api/v1/tasks/{task_id}/comments",
+        json={"content": "editor comment"},
+        headers=editor,
+    )
+    assert comment.status_code == 201
+    comment_id = comment.json()["id"]
+    assert (
+        await client.delete(f"/api/v1/tasks/{task_id}/comments/{comment_id}", headers=other_editor)
+    ).status_code == 403
+    assert (
+        await client.delete(f"/api/v1/tasks/{task_id}/comments/{comment_id}", headers=owner)
+    ).status_code == 204
+
+    admin_comment = await client.post(
+        f"/api/v1/tasks/{task_id}/comments",
+        json={"content": "admin target"},
+        headers=editor,
+    )
+    assert admin_comment.status_code == 201
+    assert (
+        await client.delete(
+            f"/api/v1/tasks/{task_id}/comments/{admin_comment.json()['id']}", headers=admin
+        )
+    ).status_code == 204
