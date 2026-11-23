@@ -29,7 +29,11 @@ from app.services.auth_service import AuthService
 from app.services.comment_service import CommentAccessContext, CommentService
 from app.services.label_service import LabelAccessContext, LabelService
 from app.services.member_service import MemberService
-from app.services.notification_service import LoggingNotificationService, NotificationService
+from app.services.notification_service import (
+    LoggingNotificationService,
+    NotificationService,
+    SmtpNotificationService,
+)
 from app.services.project_service import ProjectAccessContext, ProjectService
 from app.services.task_service import TaskAccessContext, TaskService
 from app.services.user_context import resolve_user
@@ -38,6 +42,8 @@ from app.services.workspace_service import WorkspaceService
 
 
 def get_notification_service() -> NotificationService:
+    if settings.smtp_enabled:
+        return SmtpNotificationService(settings)
     return LoggingNotificationService()
 
 
