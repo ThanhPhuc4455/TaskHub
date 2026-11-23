@@ -58,3 +58,21 @@ def test_smtp_port_must_be_valid() -> None:
 def test_disabled_smtp_does_not_require_configuration() -> None:
     settings = Settings(database_url="sqlite+aiosqlite://", secret_key="test")
     assert settings.smtp_enabled is False
+
+
+def test_fastapi_app_initializes_with_settings_debug(monkeypatch: pytest.MonkeyPatch) -> None:
+    import importlib
+
+    import app.main
+    from app.core import config
+
+    monkeypatch.setenv("TASKHUB_DEBUG", "true")
+    importlib.reload(config)
+    assert config.settings.debug is True
+    try:
+        importlib.reload(app.main)
+        assert app.main.app.debug is True
+    finally:
+        monkeypatch.undo()
+        importlib.reload(config)
+        importlib.reload(app.main)

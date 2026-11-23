@@ -70,7 +70,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await engine.dispose()
 
 
-app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    debug=settings.debug,
+    lifespan=lifespan,
+)
 app.add_middleware(RequestLoggingMiddleware)
 
 
