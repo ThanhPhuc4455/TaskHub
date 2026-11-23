@@ -88,8 +88,9 @@ The Compose app runs by default with `APP_ENV=production` (requiring a non-defau
 `APP_ENV` in your environment (for example, `$env:APP_ENV = "development"`).
 
 The Compose app waits for healthy PostgreSQL and Redis, runs `alembic upgrade head`,
-then starts Uvicorn. The default host ports are `8001`, `5435`, and `6380` so they
-do not use the usual development ports.
+then starts Uvicorn. Only the application port (`8001`) and Mailpit web interface
+(`8025`) are published to the host; PostgreSQL and Redis communicate internally
+over the compose network without exposing host ports.
 
 ## Tests and quality checks
 
