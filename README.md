@@ -32,29 +32,37 @@ docker-compose.yml  app + PostgreSQL + Redis stack
 
 ## Environment variables
 
-Copy `.env.example` to `.env` for local Compose usage. Secrets are examples only;
+Copy `.env.example` to `.env` (local host execution uses `127.0.0.1`). Secrets are examples only;
 replace them locally and never commit `.env`.
 
 | Name | Required | Default | Example |
 |---|---:|---|---|
-| `APP_ENV` | no | `development` | `development` |
+| `APP_ENV` | no | `development` (Compose: `production`) | `development` |
+| `TASKHUB_DEBUG` | no | `false` | `true` |
 | `LOG_LEVEL` | no | `INFO` | `INFO` |
 | `DATABASE_URL` | Local only | — | `postgresql+asyncpg://taskhub:password@127.0.0.1:5432/taskhub` |
-| `SECRET_KEY` | yes | — | `a-long-local-secret` |
+| `SECRET_KEY` | yes | — | `a-long-local-secret-32-chars-long` |
 | `DB_ECHO` | no | `false` | `false` |
 | `REDIS_URL` | no | `redis://127.0.0.1:6379/0` | `redis://127.0.0.1:6379/0` |
 | `CACHE_TTL_SECONDS` | no | `120` | `120` |
 | `REDIS_SOCKET_CONNECT_TIMEOUT` | no | `1.0` | `1.0` |
 | `REDIS_SOCKET_TIMEOUT` | no | `1.0` | `1.0` |
+| `SMTP_ENABLED` | no | `false` | `false` |
+| `SMTP_HOST` | if SMTP enabled | — (Compose: `mailpit`) | `127.0.0.1` |
+| `SMTP_PORT` | no | `1025` | `1025` |
+| `SMTP_USERNAME` | no | — | `smtp-user` |
+| `SMTP_PASSWORD` | no | — | `smtp-password` |
+| `SMTP_USE_TLS` | no | `false` | `false` |
+| `SMTP_START_TLS` | no | `false` | `false` |
+| `SMTP_TIMEOUT_SECONDS` | no | `10` | `10` |
+| `SMTP_FROM_ADDRESS` | if SMTP enabled | — (Compose: `taskhub@example.local`) | `taskhub@example.local` |
+| `MAILPIT_WEB_PORT` | Compose only | `8025` | `8025` |
 | `APP_PORT` | Compose only | `8001` | `8001` |
 | `POSTGRES_DB` | Compose only | — | `taskhub` |
 | `POSTGRES_USER` | Compose only | — | `taskhub` |
 | `POSTGRES_PASSWORD` | Compose only | — | local password |
 
-`APP_ENV` accepts `development`, `test`, or `production`. Production rejects a
-missing, short, or sample `SECRET_KEY`. `LOG_LEVEL` accepts `DEBUG`, `INFO`,
-`WARNING`, or `ERROR`; production defaults to `INFO`. `TASKHUB_DEBUG` can enable
-debug mode explicitly, while the default is `False`.
+`APP_ENV` accepts `development`, `test`, or `production`. In Docker Compose, `APP_ENV` defaults to `production`. Production strictly requires a non-default `SECRET_KEY` of at least 32 characters. `LOG_LEVEL` accepts `DEBUG`, `INFO`, `WARNING`, or `ERROR`; production defaults to `INFO`. `TASKHUB_DEBUG` enables debug mode explicitly (`False` by default).
 
 ## Run locally
 
@@ -66,24 +74,25 @@ uv run alembic upgrade head
 uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-The API documentation is available at `http://127.0.0.1:8000/docs` and ReDoc at
-`http://127.0.0.1:8000/redoc`.
+The lightweight health endpoint is available at `GET http://127.0.0.1:8000/health` (returns `{"status":"ok"}` without querying the database). The interactive API documentation is available at `http://127.0.0.1:8000/docs` and ReDoc at `http://127.0.0.1:8000/redoc`.
 
 ## Run with Docker Compose
 
 After setting the variables from `.env.example`:
+
+> [!IMPORTANT]
+> Because Docker Compose defaults to `APP_ENV=production`, setting a strong `SECRET_KEY` (at least 32 characters, not matching default sample keys) in `.env` is required. The application container will fail startup validation if `SECRET_KEY` is weak or missing.
+
+Start the application stack:
 
 ```powershell
 docker compose -p taskhub_day7 up -d --build
 Start-Sleep -Seconds 10
 docker compose -p taskhub_day7 ps
 docker compose -p taskhub_day7 logs app
-docker compose -p taskhub_day7 down -v
 ```
 
-The Compose app runs by default with `APP_ENV=production` (requiring a non-default
-`SECRET_KEY` of at least 32 characters). To run Compose in development mode, override
-`APP_ENV` in your environment (for example, `$env:APP_ENV = "development"`).
+The Compose app runs by default with `APP_ENV=production` (requiring a non-default `SECRET_KEY` of at least 32 characters). To run Compose in development mode, override `APP_ENV` in your environment (for example, `$env:APP_ENV = "development"`).
 
 Compose automatically constructs `DATABASE_URL` from `POSTGRES_USER`,
 `POSTGRES_PASSWORD`, and `POSTGRES_DB`, and sets `REDIS_URL` to internal service `redis://redis:6379/0`.
@@ -91,6 +100,22 @@ The Compose app waits for healthy PostgreSQL and Redis, runs `alembic upgrade he
 then starts Uvicorn. Only the application port (`8001`) and Mailpit web interface
 (`8025`) are published to the host; PostgreSQL and Redis communicate internally
 over the compose network without exposing host ports.
+
+When running via Compose, the healthcheck endpoint is available at `GET http://127.0.0.1:8001/health` and docs at `http://127.0.0.1:8001/docs`.
+
+### Stop and clean up Compose
+
+To stop running containers:
+
+```powershell
+docker compose -p taskhub_day7 down
+```
+
+To stop containers and remove persistent volumes (warning: deletes all database data):
+
+```powershell
+docker compose -p taskhub_day7 down -v
+```
 
 ## Create an ADMIN user
 
@@ -115,8 +140,7 @@ uv run python scripts/create_admin.py `
 
 ## Tests and quality checks
 
-Use a disposable review database for PostgreSQL integration tests. The following
-PowerShell setup makes all PostgreSQL test variables point to the same review DB:
+Use a disposable review database for PostgreSQL integration tests. Replace `password` with your local PostgreSQL password, and adjust the port (such as `5434` or `5432`) to match your PostgreSQL server instance:
 
 ```powershell
 $reviewDb = "postgresql+asyncpg://taskhub:password@127.0.0.1:5434/taskhub_review"
@@ -126,10 +150,12 @@ $env:REVIEW9_DATABASE_URL = $reviewDb
 $env:REVIEW9_MIGRATION_DATABASE_URL = $reviewDb
 $env:REVIEW10_DATABASE_URL = $reviewDb
 $env:REVIEW11_DATABASE_URL = $reviewDb
+$env:REVIEW12_DATABASE_URL = $reviewDb
 uv run pytest -rs
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy .
+uv run alembic upgrade head
 uv run alembic check
 ```
 
@@ -179,8 +205,8 @@ Every error response uses the envelope below. Validation errors use a list in
 ```
 
 Every response has an `X-Request-ID` header. Application and server logs (including
-Uvicorn) include request ID, method, path, status, and duration, and redact
-Authorization, passwords, and full email addresses.
+Uvicorn) include `request_id` in their log output, and redact sensitive fields
+(Authorization tokens, passwords, and email addresses).
 
 ## Task-list cache
 
@@ -205,7 +231,7 @@ For local testing, start the Mailpit service with `docker compose -p taskhub_day
 Mailpit accepts SMTP on the internal `mailpit:1025` address and its web UI is available at
 `http://127.0.0.1:8025`. Set `SMTP_ENABLED=true`, `SMTP_HOST=mailpit`, `SMTP_PORT=1025`,
 `SMTP_USE_TLS=false`, and `SMTP_START_TLS=false` in the compose environment.
-failures do not fail the API request.
+Notification send failures are logged without the recipient address and do not fail the API request.
 
 ## Migrations
 
