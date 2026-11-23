@@ -11,8 +11,12 @@ PRODUCTION_FORMAT = (
 )
 
 _SENSITIVE_PATTERNS = (
-    (re.compile(r"(?i)(authorization\s*[:=]\s*).+"), r"\1[REDACTED]"),
-    (re.compile(r"(?i)(password\s*[:=]\s*)([^\s,]+)"), r"\1[REDACTED]"),
+    (
+        re.compile(
+            r"(?i)([\"']?(?:authorization|password|access_token|refresh_token)[\"']?\s*[:=]\s*)([\"']?)(?:Bearer\s+)?[^\"',\s}]+([\"']?)"
+        ),
+        r"\1\2[REDACTED]\3",
+    ),
     (re.compile(r"\b[\w.+-]+@[\w.-]+\.\w+\b"), "[REDACTED_EMAIL]"),
 )
 

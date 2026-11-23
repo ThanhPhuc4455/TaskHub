@@ -28,6 +28,32 @@ def test_production_format_contains_request_id_and_redacts_sensitive_values() ->
     assert "user@example.com" not in output
 
 
+def test_formatter_redacts_quoted_dict_json_and_token_values() -> None:
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.addFilter(RequestContextFilter())
+    handler.setFormatter(RequestContextFormatter("%(message)s"))
+    logger = logging.getLogger("test.redaction.shapes")
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    try:
+        logger.info(
+            'password=plain "password": "json-secret" '
+            "'authorization': 'Bearer dict-secret' "
+            "access_token=access-secret refresh_token=refresh-secret"
+        )
+    finally:
+        logger.removeHandler(handler)
+        logger.propagate = True
+        handler.close()
+
+    output = stream.getvalue()
+    for secret in ("plain", "json-secret", "dict-secret", "access-secret", "refresh-secret"):
+        assert secret not in output
+    assert output.count("[REDACTED]") >= 5
+
+
 def test_mismatched_format_arguments_do_not_raise() -> None:
     logger = logging.getLogger("test.mismatched.logging")
     stream = io.StringIO()
