@@ -167,11 +167,17 @@ Redis read/write failures are logged and fall back to PostgreSQL. Invalidation r
 after successful database commits. If invalidation fails after a commit, an older
 cache entry can remain for at most `CACHE_TTL_SECONDS`.
 
-## Background notifications
+## Notifications
 
-Assignment notifications use FastAPI `BackgroundTasks` and are currently simulated
-by safe log messages. No SMTP integration is included. Notifications are queued only
-when a task is assigned to another user or changed to a new assignee; notification
+Assignment notifications use FastAPI `BackgroundTasks`. SMTP is disabled by default;
+when enabled, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
+`SMTP_USE_TLS`, `SMTP_START_TLS`, `SMTP_TIMEOUT_SECONDS`, and `SMTP_FROM_ADDRESS`.
+Notifications are queued only when a task is assigned to another user or changed to a new assignee.
+
+For local testing, start the Mailpit service with `docker compose -p taskhub_day7 up -d`.
+Mailpit accepts SMTP on the internal `mailpit:1025` address and its web UI is available at
+`http://127.0.0.1:8025`. Set `SMTP_ENABLED=true`, `SMTP_HOST=mailpit`, `SMTP_PORT=1025`,
+`SMTP_USE_TLS=false`, and `SMTP_START_TLS=false` in the compose environment.
 failures do not fail the API request.
 
 ## Migrations

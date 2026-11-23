@@ -13,6 +13,15 @@ services:
       CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-120}
       REDIS_SOCKET_CONNECT_TIMEOUT: ${REDIS_SOCKET_CONNECT_TIMEOUT:-1.0}
       REDIS_SOCKET_TIMEOUT: ${REDIS_SOCKET_TIMEOUT:-1.0}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-false}
+      SMTP_START_TLS: ${SMTP_START_TLS:-false}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-10}
+      SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-taskhub@example.local}
     ports:
       - "${APP_PORT:-8001}:8000"
     depends_on:
@@ -50,6 +59,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    expose:
+      - "1025"
+    ports:
+      - "127.0.0.1:${MAILPIT_WEB_PORT:-8025}:8025"
 
 volumes:
   taskhub_day7_postgres_data:

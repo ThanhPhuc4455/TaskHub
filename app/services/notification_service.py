@@ -53,14 +53,17 @@ class SmtpNotificationService:
         message.set_content(
             f"Task: {task_title}\nProject: {project_name}\nAssigned by: {assigner_name}"
         )
+        username = self.settings.smtp_username or None
         password = (
-            self.settings.smtp_password.get_secret_value() if self.settings.smtp_password else None
+            self.settings.smtp_password.get_secret_value()
+            if username and self.settings.smtp_password
+            else None
         )
         await aiosmtplib.send(
             message,
             hostname=self.settings.smtp_host,
             port=self.settings.smtp_port,
-            username=self.settings.smtp_username,
+            username=username,
             password=password,
             use_tls=self.settings.smtp_use_tls,
             start_tls=self.settings.smtp_start_tls,
