@@ -20,12 +20,22 @@ _SENSITIVE_PATTERNS = (
 class RequestContextFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = request_id_context.get()
-        message = record.getMessage()
+        try:
+            record.getMessage()
+        except Exception:
+            return True
+        return True
+
+
+class RequestContextFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        try:
+            message = super().format(record)
+        except Exception:
+            message = f"{record.levelname} {record.name}: {record.msg}"
         for pattern, replacement in _SENSITIVE_PATTERNS:
             message = pattern.sub(replacement, message)
-        record.msg = message
-        record.args = ()
-        return True
+        return message
 
 
 def configure_logging(settings: Settings) -> None:
@@ -37,8 +47,8 @@ def configure_logging(settings: Settings) -> None:
             "disable_existing_loggers": False,
             "filters": {"request_context": {"()": RequestContextFilter}},
             "formatters": {
-                "development": {"format": DEVELOPMENT_FORMAT},
-                "production": {"format": PRODUCTION_FORMAT},
+                "development": {"()": RequestContextFormatter, "format": DEVELOPMENT_FORMAT},
+                "production": {"()": RequestContextFormatter, "format": PRODUCTION_FORMAT},
             },
             "handlers": {
                 "console": {

@@ -1,7 +1,7 @@
 import io
 import logging
 
-from app.core.logging import PRODUCTION_FORMAT, RequestContextFilter
+from app.core.logging import PRODUCTION_FORMAT, RequestContextFilter, RequestContextFormatter
 from app.core.middleware import request_id_context
 
 
@@ -9,7 +9,7 @@ def test_production_format_contains_request_id_and_redacts_sensitive_values() ->
     stream = io.StringIO()
     handler = logging.StreamHandler(stream)
     handler.addFilter(RequestContextFilter())
-    handler.setFormatter(logging.Formatter(PRODUCTION_FORMAT))
+    handler.setFormatter(RequestContextFormatter(PRODUCTION_FORMAT))
     logger = logging.getLogger("test.production.logging")
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
@@ -26,3 +26,21 @@ def test_production_format_contains_request_id_and_redacts_sensitive_values() ->
     assert "secret" not in output
     assert "hidden" not in output
     assert "user@example.com" not in output
+
+
+def test_mismatched_format_arguments_do_not_raise() -> None:
+    logger = logging.getLogger("test.mismatched.logging")
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.addFilter(RequestContextFilter())
+    handler.setFormatter(RequestContextFormatter("%(message)s"))
+    logger.addHandler(handler)
+    logger.propagate = False
+    logger.setLevel(logging.WARNING)
+    try:
+        logger.warning("a %s %s", 1)
+        assert "a %s %s" in stream.getvalue()
+    finally:
+        logger.removeHandler(handler)
+        logger.propagate = True
+        handler.close()
