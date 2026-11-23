@@ -1,5 +1,6 @@
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.core.messages import FORBIDDEN_MESSAGE
+from app.core.pagination import PageResult, Pagination
 from app.models.user import User, UserRole
 from app.models.workspace import Workspace
 from app.models.workspace_member import WorkspaceMemberRole
@@ -13,7 +14,7 @@ class WorkspaceService:
         self._workspaces = workspaces
         self._members = members
 
-    async def require_role(
+    async def authorize(
         self, workspace_id: int, user: User, required: WorkspaceMemberRole
     ) -> Workspace:
         workspace = await self._workspaces.get(workspace_id)
@@ -28,6 +29,11 @@ class WorkspaceService:
             raise ForbiddenError(FORBIDDEN_MESSAGE)
         return workspace
 
+    async def require_role(
+        self, workspace_id: int, user: User, required: WorkspaceMemberRole
+    ) -> Workspace:
+        return await self.authorize(workspace_id, user, required)
+
     async def create(self, payload: WorkspaceCreate, owner_id: int) -> Workspace:
         workspace = await self._workspaces.create(
             commit=False, name=payload.name, owner_id=owner_id
@@ -41,10 +47,13 @@ class WorkspaceService:
         await self._workspaces.commit()
         return workspace
 
-    async def list_for_user(self, user: User) -> list[Workspace]:
+    async def list_for_user(self, user: User, pagination: Pagination) -> PageResult[Workspace]:
         if user.role == UserRole.ADMIN:
-            return await self._workspaces.get_all()
-        return await self._workspaces.get_for_user(user.id)
+            return await self._workspaces.get_page(pagination)
+        return await self._workspaces.get_for_user(user.id, pagination)
+
+    async def list_all(self, pagination: Pagination) -> PageResult[Workspace]:
+        return await self._workspaces.get_page(pagination)
 
     async def get(self, workspace: Workspace) -> Workspace:
         return workspace
