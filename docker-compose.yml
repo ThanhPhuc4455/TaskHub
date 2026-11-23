@@ -7,7 +7,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY}
-      APP_ENV: ${APP_ENV:-development}
+      APP_ENV: ${APP_ENV:-production}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       DB_ECHO: ${DB_ECHO:-false}
       CACHE_TTL_SECONDS: ${CACHE_TTL_SECONDS:-120}

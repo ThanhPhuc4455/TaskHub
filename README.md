@@ -83,6 +83,10 @@ docker compose -p taskhub logs app
 docker compose -p taskhub down -v
 ```
 
+The Compose app runs by default with `APP_ENV=production` (requiring a non-default
+`SECRET_KEY` of at least 32 characters). To run Compose in development mode, override
+`APP_ENV` in your environment (for example, `$env:APP_ENV = "development"`).
+
 The Compose app waits for healthy PostgreSQL and Redis, runs `alembic upgrade head`,
 then starts Uvicorn. The default host ports are `8001`, `5435`, and `6380` so they
 do not use the usual development ports.
