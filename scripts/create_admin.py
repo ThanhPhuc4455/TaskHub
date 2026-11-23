@@ -1,5 +1,10 @@
 import argparse
 import asyncio
+import sys
+from pathlib import Path
+
+# Ensure project root is in sys.path when running as a standalone script
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.core.database import AsyncSessionLocal
 from app.core.security import hash_password

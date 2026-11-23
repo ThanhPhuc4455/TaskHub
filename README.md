@@ -76,11 +76,11 @@ The API documentation is available at `http://127.0.0.1:8000/docs` and ReDoc at
 After setting the variables from `.env.example`:
 
 ```powershell
-docker compose -p taskhub up -d --build
+docker compose -p taskhub_day7 up -d --build
 Start-Sleep -Seconds 10
-docker compose -p taskhub ps
-docker compose -p taskhub logs app
-docker compose -p taskhub down -v
+docker compose -p taskhub_day7 ps
+docker compose -p taskhub_day7 logs app
+docker compose -p taskhub_day7 down -v
 ```
 
 The Compose app runs by default with `APP_ENV=production` (requiring a non-default
@@ -91,6 +91,27 @@ The Compose app waits for healthy PostgreSQL and Redis, runs `alembic upgrade he
 then starts Uvicorn. Only the application port (`8001`) and Mailpit web interface
 (`8025`) are published to the host; PostgreSQL and Redis communicate internally
 over the compose network without exposing host ports.
+
+## Create an ADMIN user
+
+ADMIN creation is intentionally not exposed through public registration.
+In a running Docker Compose environment, create an ADMIN user with:
+
+```powershell
+docker compose -p taskhub_day7 exec app python scripts/create_admin.py `
+  --email admin@example.com `
+  --full-name "TaskHub Admin" `
+  --password "change-this-password-32-chars-ok"
+```
+
+Or when running locally:
+
+```powershell
+uv run python scripts/create_admin.py `
+  --email admin@example.com `
+  --full-name "TaskHub Admin" `
+  --password "change-this-password-32-chars-ok"
+```
 
 ## Tests and quality checks
 
