@@ -152,8 +152,9 @@ Every error response uses the envelope below. Validation errors use a list in
 }
 ```
 
-Every response has an `X-Request-ID` header. Logs include request ID, method, path,
-status, and duration, and redact Authorization, passwords, and full email addresses.
+Every response has an `X-Request-ID` header. Application and server logs (including
+Uvicorn) include request ID, method, path, status, and duration, and redact
+Authorization, passwords, and full email addresses.
 
 ## Task-list cache
 

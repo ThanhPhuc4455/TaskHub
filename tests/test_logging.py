@@ -70,3 +70,19 @@ def test_mismatched_format_arguments_do_not_raise() -> None:
         logger.removeHandler(handler)
         logger.propagate = True
         handler.close()
+
+
+def test_uvicorn_loggers_configured_with_console_handler_and_filter() -> None:
+    from app.core.config import Settings
+    from app.core.logging import configure_logging
+
+    settings = Settings(app_env="development")
+    configure_logging(settings)
+    for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        logger = logging.getLogger(name)
+        assert any(
+            isinstance(f, RequestContextFilter) for h in logger.handlers for f in h.filters
+        ), f"{name} logger should have RequestContextFilter"
+        assert any(isinstance(h.formatter, RequestContextFormatter) for h in logger.handlers), (
+            f"{name} logger should have RequestContextFormatter"
+        )

@@ -62,8 +62,11 @@ def configure_logging(settings: Settings) -> None:
                     "stream": "ext://sys.stderr",
                 }
             },
+            "loggers": {
+                "uvicorn": {"handlers": ["console"], "level": level, "propagate": False},
+                "uvicorn.error": {"handlers": ["console"], "level": level, "propagate": False},
+                "uvicorn.access": {"handlers": ["console"], "level": level, "propagate": False},
+            },
             "root": {"level": level, "handlers": ["console"]},
         }
     )
-    for logger_name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
-        logging.getLogger(logger_name).setLevel(level)
