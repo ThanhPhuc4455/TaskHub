@@ -27,3 +27,4 @@ SMTP_CONFIGURATION_REQUIRED_MESSAGE = "SMTP host and from address are required w
 PRODUCTION_SECRET_KEY_MESSAGE = (
     "production SECRET_KEY must be at least 32 characters and non-default"
 )
+PRODUCTION_DEBUG_FORBIDDEN_MESSAGE = "debug mode cannot be enabled in production"

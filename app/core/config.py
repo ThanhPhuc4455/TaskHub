@@ -14,6 +14,7 @@ from app.core.constants import (
     SMTP_TIMEOUT_SECONDS,
 )
 from app.core.messages import (
+    PRODUCTION_DEBUG_FORBIDDEN_MESSAGE,
     PRODUCTION_SECRET_KEY_MESSAGE,
     SMTP_CONFIGURATION_REQUIRED_MESSAGE,
 )
@@ -24,7 +25,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     api_v1_prefix: str = "/api/v1"
     app_env: Literal["development", "test", "production"] = "development"
-    debug: bool = Field(default=False, validation_alias=AliasChoices("TASKHUB_DEBUG"))
+    debug: bool = Field(default=False, validation_alias=AliasChoices("TASKHUB_DEBUG", "debug"))
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
     database_url: str
@@ -49,10 +50,14 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
-        if self.app_env == "production" and (
-            len(self.secret_key) < SECRET_KEY_MIN_LENGTH or self.secret_key in SECRET_KEY_BLOCKLIST
-        ):
-            raise ValueError(PRODUCTION_SECRET_KEY_MESSAGE)
+        if self.app_env == "production":
+            if (
+                len(self.secret_key) < SECRET_KEY_MIN_LENGTH
+                or self.secret_key in SECRET_KEY_BLOCKLIST
+            ):
+                raise ValueError(PRODUCTION_SECRET_KEY_MESSAGE)
+            if self.debug:
+                raise ValueError(PRODUCTION_DEBUG_FORBIDDEN_MESSAGE)
         return self
 
     @model_validator(mode="after")
@@ -64,6 +69,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
+        populate_by_name=True,
     )
 
 
