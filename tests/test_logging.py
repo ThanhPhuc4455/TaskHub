@@ -95,6 +95,35 @@ def test_mismatched_format_arguments_do_not_raise() -> None:
         handler.close()
 
 
+def test_formatter_fallback_preserves_request_id_and_traceback_on_mismatched_args() -> None:
+    token = request_id_context.set("err-request-42")
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.addFilter(RequestContextFilter())
+    handler.setFormatter(RequestContextFormatter(PRODUCTION_FORMAT))
+    logger = logging.getLogger("test.fallback.logging")
+    logger.addHandler(handler)
+    logger.setLevel(logging.ERROR)
+    logger.propagate = False
+    try:
+        try:
+            raise ValueError("simulated root error")
+        except ValueError:
+            logger.exception("failure details: %s %s", "arg1")
+    finally:
+        request_id_context.reset(token)
+        logger.removeHandler(handler)
+        logger.propagate = True
+        handler.close()
+
+    output = stream.getvalue()
+    assert "request_id=err-request-42" in output
+    assert "level=ERROR" in output
+    assert "failure details: %s %s (args=('arg1',))" in output
+    assert "Traceback (most recent call last):" in output
+    assert "ValueError: simulated root error" in output
+
+
 def test_uvicorn_loggers_configured_with_console_handler_and_filter() -> None:
     from app.core.config import Settings
     from app.core.logging import configure_logging

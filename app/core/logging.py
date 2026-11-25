@@ -32,7 +32,9 @@ class RequestContextFormatter(logging.Formatter):
         try:
             message = super().format(record)
         except Exception:
-            message = f"{record.levelname} {record.name}: {record.msg}"
+            record.msg = f"{record.msg} (args={record.args!r})"
+            record.args = None
+            message = super().format(record)
         for pattern, replacement in _SENSITIVE_PATTERNS:
             message = pattern.sub(replacement, message)
         return message
