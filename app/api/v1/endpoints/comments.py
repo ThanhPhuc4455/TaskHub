@@ -6,7 +6,7 @@ from app.api.deps import (
     CurrentUser,
     PaginationDep,
     TaskEditor,
-    TaskViewer,
+    TaskSummaryViewer,
 )
 from app.api.responses import RBAC_RESPONSES
 from app.models.comment import Comment
@@ -32,7 +32,7 @@ async def create_comment(
 
 @router.get("/tasks/{task_id}/comments", response_model=PageResponse[CommentRead])
 async def list_comments(
-    task: TaskViewer, service: CommentServiceDep, pagination: PaginationDep
+    task: TaskSummaryViewer, service: CommentServiceDep, pagination: PaginationDep
 ) -> PageResponse[CommentRead]:
     result = await service.list_comments(task, pagination)
     return PageResponse.from_page_result(result, pagination)

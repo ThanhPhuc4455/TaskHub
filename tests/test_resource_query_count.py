@@ -61,3 +61,31 @@ async def test_list_tasks_query_count(client: AsyncClient) -> None:
 
     assert response.status_code == 200
     assert len(statements) == 7
+
+
+async def test_list_comments_query_count(client: AsyncClient) -> None:
+    owner = await login_as(client, "comments-query-owner@example.com")
+    _, project_id = await create_workspace_and_project(
+        client, owner, workspace_name="Comments query count workspace"
+    )
+    created_task = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "Comments query task"},
+        headers=owner,
+    )
+    assert created_task.status_code == 201
+    task_id = created_task.json()["id"]
+    created_comment = await client.post(
+        f"/api/v1/tasks/{task_id}/comments",
+        json={"content": "First comment"},
+        headers=owner,
+    )
+    assert created_comment.status_code == 201
+
+    engine = fastapi_app.state.test_sessionmaker.kw["bind"]
+    with capture_queries(engine) as statements:
+        response = await client.get(f"/api/v1/tasks/{task_id}/comments", headers=owner)
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+    assert len(statements) == 7
