@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     api_v1_prefix: str = "/api/v1"
     app_env: Literal["development", "test", "production"] = "development"
-    debug: bool = Field(default=False, validation_alias=AliasChoices("TASKHUB_DEBUG", "debug"))
+    debug: bool = Field(default=False, validation_alias=AliasChoices("TASKHUB_DEBUG"))
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
     database_url: str
@@ -69,10 +69,14 @@ class Settings(BaseSettings):
             raise ValueError(SMTP_CONFIGURATION_REQUIRED_MESSAGE)
         return self
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        if "debug" in kwargs:
+            kwargs["TASKHUB_DEBUG"] = kwargs.pop("debug")
+        super().__init__(*args, **kwargs)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
-        populate_by_name=True,
     )
 
 

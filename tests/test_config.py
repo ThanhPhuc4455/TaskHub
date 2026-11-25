@@ -122,3 +122,27 @@ def test_fastapi_app_debug_matches_settings() -> None:
     dev_settings = Settings(database_url="sqlite+aiosqlite://", secret_key="test", debug=True)
     custom_app = FastAPI(debug=dev_settings.debug)
     assert custom_app.debug is True
+
+
+def test_bare_debug_env_var_is_ignored_and_debug_kwarg_mapped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEBUG", "true")
+    monkeypatch.delenv("TASKHUB_DEBUG", raising=False)
+    settings = Settings(database_url="sqlite+aiosqlite://", secret_key="test")
+    assert settings.debug is False
+
+    monkeypatch.setenv("TASKHUB_DEBUG", "true")
+    settings_taskhub = Settings(database_url="sqlite+aiosqlite://", secret_key="test")
+    assert settings_taskhub.debug is True
+
+    settings_kwarg = Settings(database_url="sqlite+aiosqlite://", secret_key="test", debug=True)
+    assert settings_kwarg.debug is True
+
+    with pytest.raises(ValidationError, match="debug mode cannot be enabled in production"):
+        Settings(
+            database_url="sqlite+aiosqlite://",
+            secret_key="a" * 32,
+            app_env="production",
+            debug=True,
+        )
