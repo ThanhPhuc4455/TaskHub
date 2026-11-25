@@ -94,12 +94,18 @@ docker compose -p taskhub_day7 logs app
 
 The Compose app runs by default with `APP_ENV=production` (requiring a non-default `SECRET_KEY` of at least 32 characters). To run Compose in development mode, uncomment `APP_ENV=development` in `.env` or override `APP_ENV` in your environment (for example, `$env:APP_ENV = "development"`).
 
+To run development services (such as Mailpit for local email inspection), include `--profile dev`:
+
+```powershell
+docker compose -p taskhub_day7 --profile dev up -d --build
+```
+
 Compose automatically constructs `DATABASE_URL` from `POSTGRES_USER`,
 `POSTGRES_PASSWORD`, and `POSTGRES_DB`, and sets `REDIS_URL` to internal service `redis://redis:6379/0`.
 The Compose app waits for healthy PostgreSQL and Redis, runs `alembic upgrade head`,
-then starts Uvicorn. Only the application port (`8001`) and Mailpit web interface
-(`8025`) are published to the host; PostgreSQL and Redis communicate internally
-over the compose network without exposing host ports.
+then starts Uvicorn. Only the application port (`8001`) is published to the host by default;
+when `--profile dev` is enabled, Mailpit web interface (`8025`) is also published at `http://127.0.0.1:8025`.
+PostgreSQL and Redis communicate internally over the compose network without exposing host ports.
 
 When running via Compose, the healthcheck endpoint is available at `GET http://127.0.0.1:8001/health` and docs at `http://127.0.0.1:8001/docs`.
 
@@ -227,7 +233,7 @@ when enabled, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWOR
 `SMTP_USE_TLS`, `SMTP_START_TLS`, `SMTP_TIMEOUT_SECONDS`, and `SMTP_FROM_ADDRESS`.
 Notifications are queued only when a task is assigned to another user or changed to a new assignee.
 
-For local testing, start the Mailpit service with `docker compose -p taskhub_day7 up -d`.
+For local testing, start the Mailpit service with `docker compose -p taskhub_day7 --profile dev up -d`.
 Mailpit accepts SMTP on the internal `mailpit:1025` address and its web UI is available at
 `http://127.0.0.1:8025`. Set `SMTP_ENABLED=true`, `SMTP_HOST=mailpit`, `SMTP_PORT=1025`,
 `SMTP_USE_TLS=false`, and `SMTP_START_TLS=false` in the compose environment.

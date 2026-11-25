@@ -70,7 +70,8 @@ services:
       retries: 10
 
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.34.0
+    profiles: ["dev"]
     expose:
       - "1025"
     ports:
