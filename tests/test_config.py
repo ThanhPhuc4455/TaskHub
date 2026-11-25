@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.core.config import Settings
+from app.core.messages import SMTP_TLS_MUTUALLY_EXCLUSIVE_MESSAGE
 
 
 def test_cache_ttl_must_be_positive() -> None:
@@ -96,6 +97,17 @@ def test_smtp_port_must_be_valid() -> None:
 def test_disabled_smtp_does_not_require_configuration() -> None:
     settings = Settings(database_url="sqlite+aiosqlite://", secret_key="test")
     assert settings.smtp_enabled is False
+
+
+def test_smtp_tls_and_start_tls_mutually_exclusive() -> None:
+    with pytest.raises(ValidationError) as exc_info:
+        Settings(
+            database_url="sqlite+aiosqlite://",
+            secret_key="test",
+            smtp_use_tls=True,
+            smtp_start_tls=True,
+        )
+    assert SMTP_TLS_MUTUALLY_EXCLUSIVE_MESSAGE in str(exc_info.value)
 
 
 def test_settings_debug_validation_alias(monkeypatch: pytest.MonkeyPatch) -> None:

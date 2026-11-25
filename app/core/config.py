@@ -17,6 +17,7 @@ from app.core.messages import (
     PRODUCTION_DEBUG_FORBIDDEN_MESSAGE,
     PRODUCTION_SECRET_KEY_MESSAGE,
     SMTP_CONFIGURATION_REQUIRED_MESSAGE,
+    SMTP_TLS_MUTUALLY_EXCLUSIVE_MESSAGE,
 )
 
 
@@ -62,6 +63,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_smtp_configuration(self) -> "Settings":
+        if self.smtp_use_tls and self.smtp_start_tls:
+            raise ValueError(SMTP_TLS_MUTUALLY_EXCLUSIVE_MESSAGE)
         if self.smtp_enabled and (not self.smtp_host or not self.smtp_from_address):
             raise ValueError(SMTP_CONFIGURATION_REQUIRED_MESSAGE)
         return self

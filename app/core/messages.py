@@ -28,3 +28,4 @@ PRODUCTION_SECRET_KEY_MESSAGE = (
     "production SECRET_KEY must be at least 32 characters and non-default"
 )
 PRODUCTION_DEBUG_FORBIDDEN_MESSAGE = "debug mode cannot be enabled in production"
+SMTP_TLS_MUTUALLY_EXCLUSIVE_MESSAGE = "smtp_use_tls and smtp_start_tls are mutually exclusive"
