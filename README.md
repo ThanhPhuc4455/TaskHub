@@ -62,7 +62,7 @@ replace them locally and never commit `.env`.
 | `POSTGRES_USER` | Compose only | — | `taskhub` |
 | `POSTGRES_PASSWORD` | Compose only | — | local password |
 
-`APP_ENV` accepts `development`, `test`, or `production`. In Docker Compose, `APP_ENV` defaults to `production`. Production strictly requires a non-default `SECRET_KEY` of at least 32 characters. `LOG_LEVEL` accepts `DEBUG`, `INFO`, `WARNING`, or `ERROR`; production defaults to `INFO`. `TASKHUB_DEBUG` enables debug mode explicitly (`False` by default).
+`APP_ENV` accepts `development`, `test`, or `production`. In `.env.example`, `APP_ENV` is commented out by default (`# APP_ENV=development`). In Docker Compose, `APP_ENV` defaults to `production`. Production strictly requires a non-default `SECRET_KEY` of at least 32 characters. `LOG_LEVEL` accepts `DEBUG`, `INFO`, `WARNING`, or `ERROR`; production defaults to `INFO`. `TASKHUB_DEBUG` enables debug mode explicitly (`False` by default).
 
 ## Run locally
 
@@ -92,7 +92,7 @@ docker compose -p taskhub_day7 ps
 docker compose -p taskhub_day7 logs app
 ```
 
-The Compose app runs by default with `APP_ENV=production` (requiring a non-default `SECRET_KEY` of at least 32 characters). To run Compose in development mode, override `APP_ENV` in your environment (for example, `$env:APP_ENV = "development"`).
+The Compose app runs by default with `APP_ENV=production` (requiring a non-default `SECRET_KEY` of at least 32 characters). To run Compose in development mode, uncomment `APP_ENV=development` in `.env` or override `APP_ENV` in your environment (for example, `$env:APP_ENV = "development"`).
 
 Compose automatically constructs `DATABASE_URL` from `POSTGRES_USER`,
 `POSTGRES_PASSWORD`, and `POSTGRES_DB`, and sets `REDIS_URL` to internal service `redis://redis:6379/0`.
