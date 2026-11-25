@@ -54,6 +54,29 @@ def test_formatter_redacts_quoted_dict_json_and_token_values() -> None:
     assert output.count("[REDACTED]") >= 5
 
 
+def test_formatter_redacts_custom_authorization_scheme_and_multiword_quoted_secrets() -> None:
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.addFilter(RequestContextFilter())
+    handler.setFormatter(RequestContextFormatter("%(message)s"))
+    logger = logging.getLogger("test.redaction.schemes")
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    try:
+        logger.info('Authorization: Basic dXNlcjpwYXNz {"password": "my secret pw"}')
+    finally:
+        logger.removeHandler(handler)
+        logger.propagate = True
+        handler.close()
+
+    output = stream.getvalue()
+    assert "dXNlcjpwYXNz" not in output
+    assert "secret pw" not in output
+    assert "Basic [REDACTED]" in output
+    assert '{"password": "[REDACTED]"}' in output
+
+
 def test_mismatched_format_arguments_do_not_raise() -> None:
     logger = logging.getLogger("test.mismatched.logging")
     stream = io.StringIO()
