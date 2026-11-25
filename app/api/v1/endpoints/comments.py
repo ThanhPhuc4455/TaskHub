@@ -1,36 +1,21 @@
-from typing import Annotated, cast
+from typing import cast
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, status
 
 from app.api.deps import (
     CommentServiceDep,
+    CommentViewer,
     CurrentUser,
     PaginationDep,
-    require_comment_role,
-    require_task_role,
+    TaskEditor,
+    TaskViewer,
 )
 from app.api.responses import RBAC_RESPONSES
 from app.models.comment import Comment
-from app.models.enums import WorkspaceMemberRole
 from app.schemas.comment import CommentCreate, CommentRead
 from app.schemas.page import PageResponse
-from app.services.comment_service import CommentAccessContext
-from app.services.task_service import TaskAccessContext
 
 router = APIRouter(tags=["comments"], responses=RBAC_RESPONSES)
-
-TaskViewer = Annotated[
-    TaskAccessContext,
-    Depends(require_task_role(WorkspaceMemberRole.VIEWER)),
-]
-TaskEditor = Annotated[
-    TaskAccessContext,
-    Depends(require_task_role(WorkspaceMemberRole.EDITOR)),
-]
-CommentViewer = Annotated[
-    CommentAccessContext,
-    Depends(require_comment_role(WorkspaceMemberRole.VIEWER)),
-]
 
 
 @router.post(

@@ -1,41 +1,21 @@
-from typing import Annotated, cast
+from typing import cast
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, status
 
 from app.api.deps import (
+    LabelEditor,
     LabelServiceDep,
     PaginationDep,
-    require_label_role,
-    require_project_role,
-    require_task_role,
+    ProjectEditor,
+    ProjectViewer,
+    TaskEditor,
 )
 from app.api.responses import RBAC_RESPONSES
-from app.models.enums import WorkspaceMemberRole
 from app.models.label import Label
 from app.schemas.label import LabelCreate, LabelRead, LabelUpdate
 from app.schemas.page import PageResponse
-from app.services.label_service import LabelAccessContext
-from app.services.project_service import ProjectAccessContext
-from app.services.task_service import TaskAccessContext
 
 router = APIRouter(tags=["labels"], responses=RBAC_RESPONSES)
-
-ProjectViewer = Annotated[
-    ProjectAccessContext,
-    Depends(require_project_role(WorkspaceMemberRole.VIEWER)),
-]
-ProjectEditor = Annotated[
-    ProjectAccessContext,
-    Depends(require_project_role(WorkspaceMemberRole.EDITOR)),
-]
-TaskEditor = Annotated[
-    TaskAccessContext,
-    Depends(require_task_role(WorkspaceMemberRole.EDITOR)),
-]
-LabelEditor = Annotated[
-    LabelAccessContext,
-    Depends(require_label_role(WorkspaceMemberRole.EDITOR)),
-]
 
 
 @router.post(

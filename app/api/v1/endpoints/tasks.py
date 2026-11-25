@@ -1,43 +1,26 @@
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
+from fastapi import APIRouter, BackgroundTasks, Query, status
 
 from app.api.deps import (
     CurrentUser,
     NotificationServiceDep,
     PaginationDep,
+    ProjectEditor,
+    ProjectViewer,
+    TaskEditor,
     TaskServiceDep,
-    require_project_role,
-    require_task_role,
+    TaskViewer,
 )
 from app.api.responses import RBAC_RESPONSES
-from app.models.enums import TaskPriority, TaskStatus, WorkspaceMemberRole
+from app.models.enums import TaskPriority, TaskStatus
 from app.models.task import Task
 from app.repositories.task_repository import TaskFilters
 from app.schemas.page import PageResponse
 from app.schemas.task import TaskCreate, TaskRead, TaskUpdate
 from app.services.notification_service import queue_assignment_notification
-from app.services.project_service import ProjectAccessContext
-from app.services.task_service import TaskAccessContext
 
 router = APIRouter(tags=["tasks"], responses=RBAC_RESPONSES)
-
-ProjectViewer = Annotated[
-    ProjectAccessContext,
-    Depends(require_project_role(WorkspaceMemberRole.VIEWER)),
-]
-ProjectEditor = Annotated[
-    ProjectAccessContext,
-    Depends(require_project_role(WorkspaceMemberRole.EDITOR)),
-]
-TaskViewer = Annotated[
-    TaskAccessContext,
-    Depends(require_task_role(WorkspaceMemberRole.VIEWER)),
-]
-TaskEditor = Annotated[
-    TaskAccessContext,
-    Depends(require_task_role(WorkspaceMemberRole.EDITOR)),
-]
 
 
 @router.post(

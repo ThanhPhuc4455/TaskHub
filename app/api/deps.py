@@ -239,6 +239,7 @@ def require_workspace_role(required: WorkspaceMemberRole) -> Callable[..., Await
 
 
 WorkspaceViewer = Annotated[Workspace, Depends(require_workspace_role(WorkspaceMemberRole.VIEWER))]
+WorkspaceEditor = Annotated[Workspace, Depends(require_workspace_role(WorkspaceMemberRole.EDITOR))]
 WorkspaceOwner = Annotated[Workspace, Depends(require_workspace_role(WorkspaceMemberRole.OWNER))]
 
 
@@ -251,6 +252,20 @@ def require_project_role(
         return await projects.require_project_role(project_id, current_user, required)
 
     return dependency
+
+
+ProjectViewer = Annotated[
+    ProjectAccessContext,
+    Depends(require_project_role(WorkspaceMemberRole.VIEWER)),
+]
+ProjectEditor = Annotated[
+    ProjectAccessContext,
+    Depends(require_project_role(WorkspaceMemberRole.EDITOR)),
+]
+ProjectOwner = Annotated[
+    ProjectAccessContext,
+    Depends(require_project_role(WorkspaceMemberRole.OWNER)),
+]
 
 
 @dataclass(frozen=True)
@@ -368,3 +383,21 @@ def require_comment_role(
     required: WorkspaceMemberRole,
 ) -> Callable[..., Awaitable[CommentAccessContext]]:
     return require_resource_role(required, _load_comment_context)
+
+
+TaskViewer = Annotated[
+    TaskAccessContext,
+    Depends(require_task_role(WorkspaceMemberRole.VIEWER)),
+]
+TaskEditor = Annotated[
+    TaskAccessContext,
+    Depends(require_task_role(WorkspaceMemberRole.EDITOR)),
+]
+LabelEditor = Annotated[
+    LabelAccessContext,
+    Depends(require_label_role(WorkspaceMemberRole.EDITOR)),
+]
+CommentViewer = Annotated[
+    CommentAccessContext,
+    Depends(require_comment_role(WorkspaceMemberRole.VIEWER)),
+]
