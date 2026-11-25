@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, status
 from app.api.deps import (
     LabelServiceDep,
     PaginationDep,
+    require_label_role,
     require_project_role,
     require_task_role,
 )
@@ -33,7 +34,7 @@ TaskEditor = Annotated[
 ]
 LabelEditor = Annotated[
     LabelAccessContext,
-    Depends(require_project_role(WorkspaceMemberRole.EDITOR)),
+    Depends(require_label_role(WorkspaceMemberRole.EDITOR)),
 ]
 
 

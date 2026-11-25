@@ -160,15 +160,21 @@ async def test_task_rbac_assignee_and_archived_project(client: AsyncClient) -> N
     blocked = await client.post(
         f"/api/v1/projects/{project_id}/tasks",
         json={"title": "Blocked"},
-        headers=owner,
+        headers={**owner, "X-Request-ID": "day6-409"},
     )
     viewer_blocked = await client.post(
         f"/api/v1/projects/{project_id}/tasks",
         json={"title": "Viewer blocked"},
-        headers=viewer,
+        headers={**viewer, "X-Request-ID": "day6-403"},
     )
     assert viewer_blocked.status_code == 403
+    assert viewer_blocked.json()["detail"]
+    assert viewer_blocked.json()["code"] == "forbidden"
+    assert viewer_blocked.json()["request_id"] == "day6-403"
     assert blocked.status_code == 409
+    assert blocked.json()["detail"]
+    assert blocked.json()["code"] == "conflict"
+    assert blocked.json()["request_id"] == "day6-409"
 
 
 async def test_labels_and_comments_enforce_project_and_comment_rules(

@@ -13,9 +13,21 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 import app.models  # noqa: F401
+from app.api.deps import get_cache_backend
 from app.core.database import get_db_session
 from app.main import app as fastapi_app
 from app.models.base import Base
+
+
+class NoopCache:
+    async def get(self, key: str) -> None:
+        return None
+
+    async def set(self, key: str, value: str, *, ttl: int) -> None:
+        return None
+
+    async def incr(self, key: str) -> int:
+        return 1
 
 
 @pytest_asyncio.fixture
@@ -40,8 +52,12 @@ async def client() -> AsyncIterator[AsyncClient]:
         async with maker() as session:
             yield session
 
+    async def override_cache() -> AsyncIterator[NoopCache]:
+        yield NoopCache()
+
     fastapi_app.state.test_sessionmaker = maker
     fastapi_app.dependency_overrides[get_db_session] = override_get_db
+    fastapi_app.dependency_overrides[get_cache_backend] = override_cache
     async with AsyncClient(transport=ASGITransport(app=fastapi_app), base_url="http://test") as c:
         yield c
     fastapi_app.dependency_overrides.clear()

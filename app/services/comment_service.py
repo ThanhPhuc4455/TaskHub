@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from app.core.cache import TaskCacheInvalidator
 from app.core.pagination import PageResult, Pagination
 from app.models.comment import Comment
 from app.models.user import User
@@ -16,8 +17,15 @@ class CommentAccessContext:
 
 
 class CommentService:
-    def __init__(self, comments: CommentRepository) -> None:
+    def __init__(
+        self, comments: CommentRepository, invalidator: TaskCacheInvalidator | None = None
+    ) -> None:
         self._comments = comments
+        self._invalidator = invalidator
+
+    async def _invalidate(self, project_id: int) -> None:
+        if self._invalidator is not None:
+            await self._invalidator.invalidate(project_id)
 
     async def create(self, task: TaskAccessContext, user: User, payload: CommentCreate) -> Comment:
         ensure_project_active(task.project)
@@ -26,6 +34,7 @@ class CommentService:
             author_id=user.id,
             content=payload.content,
         )
+        await self._invalidate(task.project.id)
         return (await self._comments.get_with_author(comment.id)) or comment
 
     async def list_comments(
@@ -39,3 +48,4 @@ class CommentService:
             access.comment.author_id, user.id, access.task.effective_role
         )
         await self._comments.delete(access.comment)
+        await self._invalidate(access.task.project.id)
