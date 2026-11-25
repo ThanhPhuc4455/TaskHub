@@ -1,5 +1,3 @@
-from typing import cast
-
 from fastapi import APIRouter, status
 
 from app.api.deps import (
@@ -34,9 +32,7 @@ async def list_labels(
     access: ProjectViewer, service: LabelServiceDep, pagination: PaginationDep
 ) -> PageResponse[LabelRead]:
     result = await service.list_labels(access, pagination)
-    return PageResponse.from_result(
-        cast(list[LabelRead], result.items), result.total, pagination.page, pagination.limit
-    )
+    return PageResponse.from_page_result(result, pagination)
 
 
 @router.patch("/labels/{label_id}", response_model=LabelRead)

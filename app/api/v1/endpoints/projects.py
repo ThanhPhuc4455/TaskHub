@@ -1,5 +1,3 @@
-from typing import cast
-
 from fastapi import APIRouter, status
 
 from app.api.deps import (
@@ -44,12 +42,7 @@ async def list_projects(
     pagination: PaginationDep,
 ) -> PageResponse[ProjectRead]:
     result = await service.list_for_workspace(access, pagination)
-    return PageResponse.from_result(
-        cast(list[ProjectRead], result.items),
-        result.total,
-        pagination.page,
-        pagination.limit,
-    )
+    return PageResponse.from_page_result(result, pagination)
 
 
 @router.get("/projects/{project_id}", response_model=ProjectRead, summary="Get a project")

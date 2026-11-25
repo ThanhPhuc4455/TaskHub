@@ -1,5 +1,3 @@
-from typing import cast
-
 from fastapi import APIRouter, status
 
 from app.api.deps import (
@@ -37,9 +35,7 @@ async def list_comments(
     task: TaskViewer, service: CommentServiceDep, pagination: PaginationDep
 ) -> PageResponse[CommentRead]:
     result = await service.list_comments(task, pagination)
-    return PageResponse.from_result(
-        cast(list[CommentRead], result.items), result.total, pagination.page, pagination.limit
-    )
+    return PageResponse.from_page_result(result, pagination)
 
 
 @router.delete("/tasks/{task_id}/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)

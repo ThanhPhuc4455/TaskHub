@@ -1,5 +1,3 @@
-from typing import cast
-
 from fastapi import APIRouter, status
 
 from app.api.deps import (
@@ -28,12 +26,7 @@ async def list_members(
     pagination: PaginationDep,
 ) -> PageResponse[MemberRead]:
     result = await service.list_members(workspace_id, pagination)
-    return PageResponse.from_result(
-        cast(list[MemberRead], result.items),
-        result.total,
-        pagination.page,
-        pagination.limit,
-    )
+    return PageResponse.from_page_result(result, pagination)
 
 
 @router.post("", response_model=MemberRead, status_code=status.HTTP_201_CREATED)
