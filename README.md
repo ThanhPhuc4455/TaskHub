@@ -212,7 +212,7 @@ Every error response uses the envelope below. Validation errors use a list in
 
 Every response has an `X-Request-ID` header. Application and server logs (including
 Uvicorn) include `request_id` in their log output, and redact sensitive fields
-(Authorization tokens, passwords, and email addresses).
+(Authorization tokens, passwords, access tokens, and refresh tokens).
 
 ## Task-list cache
 
