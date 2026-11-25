@@ -8,7 +8,7 @@ from app.api.deps import (
     ProjectViewer,
     TaskEditor,
 )
-from app.api.responses import RBAC_RESPONSES
+from app.api.responses import BAD_REQUEST_RESPONSES, RBAC_RESPONSES
 from app.models.label import Label
 from app.schemas.label import LabelCreate, LabelRead, LabelUpdate
 from app.schemas.page import PageResponse
@@ -47,7 +47,11 @@ async def delete_label(access: LabelEditor, service: LabelServiceDep) -> None:
     await service.delete(access)
 
 
-@router.post("/tasks/{task_id}/labels/{label_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/tasks/{task_id}/labels/{label_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=BAD_REQUEST_RESPONSES,
+)
 async def attach_label(
     task: TaskEditor,
     label_id: int,
@@ -56,7 +60,11 @@ async def attach_label(
     await service.attach(task, label_id)
 
 
-@router.delete("/tasks/{task_id}/labels/{label_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/tasks/{task_id}/labels/{label_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=BAD_REQUEST_RESPONSES,
+)
 async def detach_label(
     task: TaskEditor,
     label_id: int,

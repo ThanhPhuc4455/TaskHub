@@ -47,8 +47,12 @@ AUTH_RESPONSES: dict[int | str, dict[str, Any]] = {
     500: {"description": "An unexpected server error occurred", **ERROR_RESPONSE_CONTENT},
 }
 
-USER_RESPONSES: dict[int | str, dict[str, Any]] = {
+BAD_REQUEST_RESPONSES: dict[int | str, dict[str, Any]] = {
     400: {"description": "The request is invalid", **ERROR_RESPONSE_CONTENT},
+}
+
+USER_RESPONSES: dict[int | str, dict[str, Any]] = {
+    **BAD_REQUEST_RESPONSES,
     401: {
         "description": "Authentication is required or the token is invalid",
         **ERROR_RESPONSE_CONTENT,
