@@ -276,3 +276,66 @@ async def test_disabled_notification_does_not_call_smtp(monkeypatch: pytest.Monk
         assigner_name="Owner",
     )
     send.assert_not_awaited()
+
+
+async def test_notification_logging_sent_only_in_smtp_service(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    settings = Settings(
+        database_url="sqlite+aiosqlite://",
+        secret_key="test",
+        smtp_enabled=True,
+        smtp_host="127.0.0.1",
+        smtp_from_address="taskhub@example.local",
+    )
+    smtp_service = SmtpNotificationService(settings)
+    monkeypatch.setattr(aiosmtplib, "send", AsyncMock())
+
+    with caplog.at_level("INFO"):
+        await smtp_service.notify_task_assigned(
+            recipient_email="recipient@example.local",
+            task_title="Task",
+            project_name="Project",
+            assigner_name="Owner",
+        )
+    assert "Task assignment notification sent" in caplog.text
+
+    caplog.clear()
+    logging_service = LoggingNotificationService()
+    with caplog.at_level("INFO"):
+        await logging_service.notify_task_assigned(
+            recipient_email="recipient@example.local",
+            task_title="Task",
+            project_name="Project",
+            assigner_name="Owner",
+        )
+    assert "Task assignment notification sent" not in caplog.text
+    assert "Task assignment notification disabled" in caplog.text
+
+
+async def test_safe_wrapper_only_logs_on_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fake_ok = FakeNotificationService()
+    with caplog.at_level("INFO"):
+        await notify_task_assigned_safely(
+            fake_ok,
+            task_id=1,
+            recipient_email="recipient@example.local",
+            task_title="Task",
+            project_name="Project",
+            assigner_name="Owner",
+        )
+    assert "Task assignment notification sent" not in caplog.text
+
+    fake_fail = FakeNotificationService(fail=True)
+    with caplog.at_level("ERROR"):
+        await notify_task_assigned_safely(
+            fake_fail,
+            task_id=2,
+            recipient_email="recipient@example.local",
+            task_title="Task",
+            project_name="Project",
+            assigner_name="Owner",
+        )
+    assert "Task assignment notification failed: task_id=2" in caplog.text

@@ -69,6 +69,7 @@ class SmtpNotificationService:
             start_tls=self.settings.smtp_start_tls,
             timeout=self.settings.smtp_timeout_seconds,
         )
+        logger.info("Task assignment notification sent")
 
 
 async def notify_task_assigned_safely(
@@ -87,7 +88,6 @@ async def notify_task_assigned_safely(
             project_name=project_name,
             assigner_name=assigner_name,
         )
-        logger.info("Task assignment notification sent: task_id=%s", task_id)
     except Exception:
         logger.exception("Task assignment notification failed: task_id=%s", task_id)
 
