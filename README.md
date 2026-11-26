@@ -150,10 +150,11 @@ Use a disposable review database for PostgreSQL integration tests. Replace `pass
 
 ```powershell
 $reviewDb = "postgresql+asyncpg://taskhub:password@127.0.0.1:5434/taskhub_review"
+$reviewMigrationDb = "postgresql+asyncpg://taskhub:password@127.0.0.1:5434/taskhub_review_mig"
 $env:DATABASE_URL = $reviewDb
 $env:REVIEW8_DATABASE_URL = $reviewDb
 $env:REVIEW9_DATABASE_URL = $reviewDb
-$env:REVIEW9_MIGRATION_DATABASE_URL = $reviewDb
+$env:REVIEW9_MIGRATION_DATABASE_URL = $reviewMigrationDb
 $env:REVIEW10_DATABASE_URL = $reviewDb
 $env:REVIEW11_DATABASE_URL = $reviewDb
 $env:REVIEW12_DATABASE_URL = $reviewDb
@@ -200,7 +201,11 @@ resource existence is not disclosed; authenticated users without enough permissi
 receive `403`.
 
 Every error response uses the envelope below. Validation errors use a list in
-`detail`; domain and HTTP errors use a string:
+`detail`; domain and HTTP errors use a string. In OpenAPI, `400 Bad Request`
+(`ErrorResponse`) is documented specifically on the endpoints that raise
+`BadRequestError` (`POST/DELETE /api/v1/tasks/{task_id}/labels/{label_id}`,
+`PATCH/DELETE /api/v1/workspaces/{workspace_id}/members/{user_id}`, and
+`POST /api/v1/users/me/change-password`).
 
 ```json
 {
