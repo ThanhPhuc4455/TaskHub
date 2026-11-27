@@ -14,7 +14,7 @@ from app.services.notification_service import (
     SmtpNotificationService,
     notify_task_assigned_safely,
 )
-from tests.helpers import login_as, user_id_of
+from tests.helpers import create_workspace_and_project, login_as, user_id_of
 
 
 class FakeNotificationService:
@@ -53,24 +53,19 @@ async def notification_service(client: AsyncClient) -> AsyncIterator[FakeNotific
 async def setup_project(client: AsyncClient) -> tuple[dict[str, str], dict[str, str], int, int]:
     owner = await login_as(client, "notification-owner@example.com")
     assignee = await login_as(client, "notification-assignee@example.com")
-    workspace = await client.post(
-        "/api/v1/workspaces", json={"name": "Notification workspace"}, headers=owner
+    workspace_id, project_id = await create_workspace_and_project(
+        client,
+        owner,
+        workspace_name="Notification workspace",
+        project_name="Notification project",
     )
-    assert workspace.status_code == 201
-    workspace_id = workspace.json()["id"]
     invited = await client.post(
         f"/api/v1/workspaces/{workspace_id}/members",
         json={"email": "notification-assignee@example.com", "role": "EDITOR"},
         headers=owner,
     )
     assert invited.status_code == 201
-    project = await client.post(
-        f"/api/v1/workspaces/{workspace_id}/projects",
-        json={"name": "Notification project"},
-        headers=owner,
-    )
-    assert project.status_code == 201
-    return owner, assignee, int(project.json()["id"]), await user_id_of(client, assignee)
+    return owner, assignee, project_id, await user_id_of(client, assignee)
 
 
 async def test_create_assigned_task_notifies_once(

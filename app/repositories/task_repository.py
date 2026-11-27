@@ -5,7 +5,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import raiseload, selectinload
 
 from app.core.pagination import PageResult, Pagination
 from app.models.label import task_labels
@@ -33,6 +33,13 @@ class TaskRepository(BaseRepository[Task]):
         if filters.assignee_id is not None:
             conditions.append(Task.assignee_id == filters.assignee_id)
         return conditions
+
+    async def get_summary(self, task_id: int) -> Task | None:
+        return await self.session.scalar(
+            select(Task)
+            .where(Task.id == task_id)
+            .options(raiseload(Task.labels), raiseload(Task.assignee), raiseload(Task.creator))
+        )
 
     async def get_with_details(self, task_id: int) -> Task | None:
         return await self.session.scalar(

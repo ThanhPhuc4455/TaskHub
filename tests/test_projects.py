@@ -3,7 +3,7 @@ from sqlalchemy import select
 
 from app.main import app as fastapi_app
 from app.models.user import User, UserRole
-from tests.helpers import login_as
+from tests.helpers import create_workspace_and_project, login_as
 
 WS = "/api/v1/workspaces"
 
@@ -83,13 +83,9 @@ async def test_editor_can_create_and_update_but_not_archive(client: AsyncClient)
 
 async def test_owner_can_archive_project(client: AsyncClient) -> None:
     owner = await login_as(client, "owner@example.com")
-    workspace_id = await create_workspace(client, owner)
-    created = await client.post(
-        f"{WS}/{workspace_id}/projects",
-        json={"name": "Project"},
-        headers=owner,
+    _, project_id = await create_workspace_and_project(
+        client, owner, workspace_name="Team A", project_name="Project"
     )
-    project_id = created.json()["id"]
 
     archive = await client.post(f"/api/v1/projects/{project_id}/archive", headers=owner)
     assert archive.status_code == 200
@@ -112,13 +108,9 @@ async def test_owner_can_archive_project(client: AsyncClient) -> None:
 
 async def test_workspace_delete_cascades_projects(client: AsyncClient) -> None:
     owner = await login_as(client, "owner@example.com")
-    workspace_id = await create_workspace(client, owner)
-    created = await client.post(
-        f"{WS}/{workspace_id}/projects",
-        json={"name": "Project"},
-        headers=owner,
+    workspace_id, project_id = await create_workspace_and_project(
+        client, owner, workspace_name="Team A", project_name="Project"
     )
-    project_id = created.json()["id"]
 
     deleted = await client.delete(f"{WS}/{workspace_id}", headers=owner)
     assert deleted.status_code == 204
@@ -157,13 +149,9 @@ async def test_project_list_supports_pagination(client: AsyncClient) -> None:
 async def test_project_idor_is_hidden_from_other_workspace(client: AsyncClient) -> None:
     owner_a = await login_as(client, "owner-a@example.com")
     owner_b = await login_as(client, "owner-b@example.com")
-    workspace_a = await create_workspace(client, owner_a)
-    created = await client.post(
-        f"{WS}/{workspace_a}/projects",
-        json={"name": "Private project"},
-        headers=owner_a,
+    _, project_id = await create_workspace_and_project(
+        client, owner_a, workspace_name="Team A", project_name="Private project"
     )
-    project_id = created.json()["id"]
 
     assert (await client.get(f"/api/v1/projects/{project_id}", headers=owner_b)).status_code == 404
     assert (
@@ -187,14 +175,9 @@ async def test_project_list_hides_workspace_from_outsider(client: AsyncClient) -
 
 async def test_admin_can_access_project_in_another_workspace(client: AsyncClient) -> None:
     owner = await login_as(client, "project-owner@example.com")
-    workspace_id = await create_workspace(client, owner)
-    created = await client.post(
-        f"{WS}/{workspace_id}/projects",
-        json={"name": "Admin-visible project"},
-        headers=owner,
+    _, project_id = await create_workspace_and_project(
+        client, owner, workspace_name="Team A", project_name="Admin-visible project"
     )
-    assert created.status_code == 201
-    project_id = created.json()["id"]
 
     await login_as(client, "project-admin@example.com")
     await promote_to_admin("project-admin@example.com")

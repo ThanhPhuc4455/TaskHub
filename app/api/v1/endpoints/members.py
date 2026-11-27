@@ -1,5 +1,3 @@
-from typing import cast
-
 from fastapi import APIRouter, status
 
 from app.api.deps import (
@@ -8,7 +6,7 @@ from app.api.deps import (
     WorkspaceOwner,
     WorkspaceViewer,
 )
-from app.api.responses import RBAC_RESPONSES
+from app.api.responses import BAD_REQUEST_RESPONSES, RBAC_RESPONSES
 from app.models.workspace_member import WorkspaceMember
 from app.schemas.member import InviteMemberRequest, MemberRead, UpdateMemberRoleRequest
 from app.schemas.page import PageResponse
@@ -28,12 +26,7 @@ async def list_members(
     pagination: PaginationDep,
 ) -> PageResponse[MemberRead]:
     result = await service.list_members(workspace_id, pagination)
-    return PageResponse.from_result(
-        cast(list[MemberRead], result.items),
-        result.total,
-        pagination.page,
-        pagination.limit,
-    )
+    return PageResponse.from_page_result(result, pagination)
 
 
 @router.post("", response_model=MemberRead, status_code=status.HTTP_201_CREATED)
@@ -46,7 +39,11 @@ async def invite_member(
     return await service.invite(workspace_id, payload)
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses=BAD_REQUEST_RESPONSES,
+)
 async def remove_member(
     user_id: int,
     service: MemberServiceDep,
@@ -55,7 +52,11 @@ async def remove_member(
     await service.remove(workspace, user_id)
 
 
-@router.patch("/{user_id}", response_model=MemberRead)
+@router.patch(
+    "/{user_id}",
+    response_model=MemberRead,
+    responses=BAD_REQUEST_RESPONSES,
+)
 async def update_member_role(
     user_id: int,
     payload: UpdateMemberRoleRequest,

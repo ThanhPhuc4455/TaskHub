@@ -239,6 +239,7 @@ def require_workspace_role(required: WorkspaceMemberRole) -> Callable[..., Await
 
 
 WorkspaceViewer = Annotated[Workspace, Depends(require_workspace_role(WorkspaceMemberRole.VIEWER))]
+WorkspaceEditor = Annotated[Workspace, Depends(require_workspace_role(WorkspaceMemberRole.EDITOR))]
 WorkspaceOwner = Annotated[Workspace, Depends(require_workspace_role(WorkspaceMemberRole.OWNER))]
 
 
@@ -253,6 +254,20 @@ def require_project_role(
     return dependency
 
 
+ProjectViewer = Annotated[
+    ProjectAccessContext,
+    Depends(require_project_role(WorkspaceMemberRole.VIEWER)),
+]
+ProjectEditor = Annotated[
+    ProjectAccessContext,
+    Depends(require_project_role(WorkspaceMemberRole.EDITOR)),
+]
+ProjectOwner = Annotated[
+    ProjectAccessContext,
+    Depends(require_project_role(WorkspaceMemberRole.OWNER)),
+]
+
+
 @dataclass(frozen=True)
 class ResourceDependencies:
     comments: CommentRepository
@@ -265,11 +280,19 @@ class ResourceDependencies:
 
 
 async def _load_task_context(
-    resources: ResourceDependencies, user: User, required: WorkspaceMemberRole
+    resources: ResourceDependencies,
+    user: User,
+    required: WorkspaceMemberRole,
+    *,
+    load_details: bool = True,
 ) -> TaskAccessContext:
     if resources.task_id is None:
         raise NotFoundError("Task", "missing")
-    task = await resources.tasks.get_with_details(resources.task_id)
+    task = (
+        await resources.tasks.get_with_details(resources.task_id)
+        if load_details
+        else await resources.tasks.get_summary(resources.task_id)
+    )
     if task is None:
         raise NotFoundError("Task", resources.task_id)
     access = await resources.projects.require_project_role(task.project_id, user, required)
@@ -354,8 +377,17 @@ def require_resource_role[ResourceContext](
 
 def require_task_role(
     required: WorkspaceMemberRole,
+    *,
+    load_details: bool = True,
 ) -> Callable[..., Awaitable[TaskAccessContext]]:
-    return require_resource_role(required, _load_task_context)
+    async def loader(
+        resources: ResourceDependencies,
+        user: User,
+        role: WorkspaceMemberRole,
+    ) -> TaskAccessContext:
+        return await _load_task_context(resources, user, role, load_details=load_details)
+
+    return require_resource_role(required, loader)
 
 
 def require_label_role(
@@ -368,3 +400,25 @@ def require_comment_role(
     required: WorkspaceMemberRole,
 ) -> Callable[..., Awaitable[CommentAccessContext]]:
     return require_resource_role(required, _load_comment_context)
+
+
+TaskViewer = Annotated[
+    TaskAccessContext,
+    Depends(require_task_role(WorkspaceMemberRole.VIEWER)),
+]
+TaskSummaryViewer = Annotated[
+    TaskAccessContext,
+    Depends(require_task_role(WorkspaceMemberRole.VIEWER, load_details=False)),
+]
+TaskEditor = Annotated[
+    TaskAccessContext,
+    Depends(require_task_role(WorkspaceMemberRole.EDITOR)),
+]
+LabelEditor = Annotated[
+    LabelAccessContext,
+    Depends(require_label_role(WorkspaceMemberRole.EDITOR)),
+]
+CommentViewer = Annotated[
+    CommentAccessContext,
+    Depends(require_comment_role(WorkspaceMemberRole.VIEWER)),
+]

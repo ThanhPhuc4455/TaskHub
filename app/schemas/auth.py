@@ -3,6 +3,7 @@ from typing import Annotated
 from pydantic import BaseModel, EmailStr, StringConstraints, field_validator
 
 from app.core.constants import EMAIL_MAX_LENGTH, FULL_NAME_MAX_LENGTH, FULL_NAME_MIN_LENGTH
+from app.core.messages import EMAIL_TOO_LONG_MESSAGE
 from app.schemas.types import Password
 
 
@@ -22,7 +23,7 @@ class RegisterRequest(BaseModel):
     @classmethod
     def normalize_email(cls, value: str) -> str:
         if len(value) > EMAIL_MAX_LENGTH:
-            raise ValueError(f"email must be at most {EMAIL_MAX_LENGTH} characters")
+            raise ValueError(EMAIL_TOO_LONG_MESSAGE.format(max_length=EMAIL_MAX_LENGTH))
         return value.lower()
 
 

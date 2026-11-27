@@ -36,21 +36,18 @@ class WorkspaceService:
         access = await self.authorize_context(workspace_id, user, required)
         return access.workspace
 
-    async def authorize_context(
-        self, workspace_id: int, user: User, required: WorkspaceMemberRole
+    async def authorize_workspace(
+        self, workspace: Workspace, user: User, required: WorkspaceMemberRole
     ) -> WorkspaceAccessContext:
-        workspace = await self._workspaces.get(workspace_id)
-        if workspace is None:
-            raise NotFoundError("Workspace", workspace_id)
         if user.role == UserRole.ADMIN:
             return WorkspaceAccessContext(
                 workspace=workspace,
                 membership=None,
                 effective_role=WorkspaceMemberRole.OWNER,
             )
-        membership = await self._members.get_membership(workspace_id, user.id)
+        membership = await self._members.get_membership(workspace.id, user.id)
         if membership is None:
-            raise NotFoundError("Workspace", workspace_id)
+            raise NotFoundError("Workspace", workspace.id)
         if membership.role.rank < required.rank:
             raise ForbiddenError(FORBIDDEN_MESSAGE)
         return WorkspaceAccessContext(
@@ -58,6 +55,14 @@ class WorkspaceService:
             membership=membership,
             effective_role=membership.role,
         )
+
+    async def authorize_context(
+        self, workspace_id: int, user: User, required: WorkspaceMemberRole
+    ) -> WorkspaceAccessContext:
+        workspace = await self._workspaces.get(workspace_id)
+        if workspace is None:
+            raise NotFoundError("Workspace", workspace_id)
+        return await self.authorize_workspace(workspace, user, required)
 
     async def require_role(
         self, workspace_id: int, user: User, required: WorkspaceMemberRole

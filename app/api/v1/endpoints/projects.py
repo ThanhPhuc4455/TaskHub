@@ -1,43 +1,20 @@
-from typing import Annotated, cast
-
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, status
 
 from app.api.deps import (
     PaginationDep,
+    ProjectEditor,
+    ProjectOwner,
     ProjectServiceDep,
-    require_project_role,
-    require_workspace_role,
+    ProjectViewer,
+    WorkspaceEditor,
+    WorkspaceViewer,
 )
 from app.api.responses import RBAC_RESPONSES
-from app.models.enums import WorkspaceMemberRole
 from app.models.project import Project
-from app.models.workspace import Workspace
 from app.schemas.page import PageResponse
 from app.schemas.project import ProjectCreate, ProjectRead, ProjectUpdate
-from app.services.project_service import ProjectAccessContext
 
 router = APIRouter(tags=["projects"], responses=RBAC_RESPONSES)
-
-WorkspaceViewer = Annotated[
-    Workspace,
-    Depends(require_workspace_role(WorkspaceMemberRole.VIEWER)),
-]
-WorkspaceEditor = Annotated[
-    Workspace,
-    Depends(require_workspace_role(WorkspaceMemberRole.EDITOR)),
-]
-ProjectViewer = Annotated[
-    ProjectAccessContext,
-    Depends(require_project_role(WorkspaceMemberRole.VIEWER)),
-]
-ProjectEditor = Annotated[
-    ProjectAccessContext,
-    Depends(require_project_role(WorkspaceMemberRole.EDITOR)),
-]
-ProjectOwner = Annotated[
-    ProjectAccessContext,
-    Depends(require_project_role(WorkspaceMemberRole.OWNER)),
-]
 
 
 @router.post(
@@ -65,12 +42,7 @@ async def list_projects(
     pagination: PaginationDep,
 ) -> PageResponse[ProjectRead]:
     result = await service.list_for_workspace(access, pagination)
-    return PageResponse.from_result(
-        cast(list[ProjectRead], result.items),
-        result.total,
-        pagination.page,
-        pagination.limit,
-    )
+    return PageResponse.from_page_result(result, pagination)
 
 
 @router.get("/projects/{project_id}", response_model=ProjectRead, summary="Get a project")

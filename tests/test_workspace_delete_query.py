@@ -1,9 +1,7 @@
-from typing import Any
-
 from httpx import AsyncClient
-from sqlalchemy import event
 
 from app.main import app as fastapi_app
+from tests.helpers import capture_queries
 
 
 async def test_delete_workspace_checks_membership_once(client: AsyncClient) -> None:
@@ -29,23 +27,8 @@ async def test_delete_workspace_checks_membership_once(client: AsyncClient) -> N
     workspace_id = created.json()["id"]
 
     engine = fastapi_app.state.test_sessionmaker.kw["bind"]
-    statements: list[str] = []
-
-    def capture_query(
-        _: Any,
-        __: Any,
-        statement: str,
-        ___: Any,
-        ____: Any,
-        _____: Any,
-    ) -> None:
-        statements.append(statement)
-
-    event.listen(engine.sync_engine, "before_cursor_execute", capture_query)
-    try:
+    with capture_queries(engine) as statements:
         response = await client.delete(f"/api/v1/workspaces/{workspace_id}", headers=headers)
-    finally:
-        event.remove(engine.sync_engine, "before_cursor_execute", capture_query)
 
     assert response.status_code == 204
     membership_queries = [

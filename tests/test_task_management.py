@@ -5,20 +5,14 @@ from sqlalchemy import select
 
 from app.main import app as fastapi_app
 from app.models.user import User, UserRole
-from tests.helpers import login_as
+from tests.helpers import create_workspace_and_project, login_as
 
 WS = "/api/v1/workspaces"
 
 
 async def project_for(client: AsyncClient, headers: dict[str, str], name: str = "Workspace") -> int:
-    workspace = await client.post(WS, json={"name": name}, headers=headers)
-    assert workspace.status_code == 201
-    workspace_id = workspace.json()["id"]
-    project = await client.post(
-        f"{WS}/{workspace_id}/projects", json={"name": "Project"}, headers=headers
-    )
-    assert project.status_code == 201
-    return int(project.json()["id"])
+    _, project_id = await create_workspace_and_project(client, headers, workspace_name=name)
+    return project_id
 
 
 async def test_task_crud_filters_and_pagination(client: AsyncClient) -> None:
