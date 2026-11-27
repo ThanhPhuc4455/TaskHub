@@ -56,9 +56,7 @@ class ProjectService:
         project = await self._projects.get_with_workspace(project_id)
         if project is None:
             raise NotFoundError("Project", project_id)
-        access = await self._workspaces.authorize_context(
-            project.workspace_id, user, required, workspace=project.workspace
-        )
+        access = await self._workspaces.authorize_workspace(project.workspace, user, required)
         return ProjectAccessContext(
             project=project,
             workspace=access.workspace,
