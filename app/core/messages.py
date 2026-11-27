@@ -23,3 +23,9 @@ PASSWORD_TOO_LONG_MESSAGE = "password must be at most {max_bytes} bytes"
 FIELD_MUST_NOT_BE_NULL_MESSAGE = "{field} must not be null"
 DUE_DATE_MUST_BE_FUTURE_MESSAGE = "due_date must be in the future"
 INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error"
+SMTP_CONFIGURATION_REQUIRED_MESSAGE = "SMTP host and from address are required when SMTP is enabled"
+PRODUCTION_SECRET_KEY_MESSAGE = (
+    "production SECRET_KEY must be at least 32 characters and non-default"
+)
+PRODUCTION_DEBUG_FORBIDDEN_MESSAGE = "debug mode cannot be enabled in production"
+SMTP_TLS_MUTUALLY_EXCLUSIVE_MESSAGE = "smtp_use_tls and smtp_start_tls are mutually exclusive"

@@ -58,6 +58,7 @@ async def create_task(
         queue_assignment_notification(
             background_tasks,
             notification,
+            task_id=result.task.id,
             recipient_email=result.task.assignee.email,
             task_title=result.task.title,
             project_name=access.project.name,
@@ -98,6 +99,7 @@ async def update_task(
         queue_assignment_notification(
             background_tasks,
             notification,
+            task_id=result.task.id,
             recipient_email=result.task.assignee.email,
             task_title=result.task.title,
             project_name=access.project.name,

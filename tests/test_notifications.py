@@ -1,11 +1,19 @@
 from collections.abc import AsyncIterator
+from unittest.mock import AsyncMock
 
+import aiosmtplib
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
 from app.api.deps import get_cache_backend, get_notification_service
+from app.core.config import Settings
 from app.main import app as fastapi_app
+from app.services.notification_service import (
+    LoggingNotificationService,
+    SmtpNotificationService,
+    notify_task_assigned_safely,
+)
 from tests.helpers import login_as, user_id_of
 
 
@@ -201,3 +209,133 @@ async def test_notification_failure_does_not_fail_task_creation(
     assert "Task assignment notification failed" in caplog.text
     fastapi_app.dependency_overrides.pop(get_notification_service, None)
     fastapi_app.dependency_overrides.pop(get_cache_backend, None)
+
+
+async def test_smtp_sender_sends_sanitized_subject(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = Settings(
+        database_url="sqlite+aiosqlite://",
+        secret_key="test",
+        smtp_enabled=True,
+        smtp_host="127.0.0.1",
+        smtp_from_address="taskhub@example.local",
+    )
+    sender = SmtpNotificationService(settings)
+    send = AsyncMock()
+    monkeypatch.setattr(aiosmtplib, "send", send)
+
+    await sender.notify_task_assigned(
+        recipient_email="recipient@example.local",
+        task_title="Fix bug\r\nBcc: attacker@example.local",
+        project_name="Project",
+        assigner_name="Owner",
+    )
+
+    send.assert_awaited_once()
+    call = send.await_args
+    assert call is not None
+    message = call.args[0]
+    assert "\r" not in message["Subject"]
+    assert "\n" not in message["Subject"]
+    assert message["To"] == "recipient@example.local"
+
+
+async def test_smtp_failure_is_safe_and_does_not_log_email(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    settings = Settings(
+        database_url="sqlite+aiosqlite://",
+        secret_key="test",
+        smtp_enabled=True,
+        smtp_host="127.0.0.1",
+        smtp_from_address="taskhub@example.local",
+    )
+    sender = SmtpNotificationService(settings)
+    monkeypatch.setattr(aiosmtplib, "send", AsyncMock(side_effect=TimeoutError))
+
+    with caplog.at_level("ERROR"):
+        await notify_task_assigned_safely(
+            sender,
+            task_id=42,
+            recipient_email="private@example.local",
+            task_title="Private task",
+            project_name="Project",
+            assigner_name="Owner",
+        )
+
+    assert "private@example.local" not in caplog.text
+
+
+async def test_disabled_notification_does_not_call_smtp(monkeypatch: pytest.MonkeyPatch) -> None:
+    send = AsyncMock()
+    monkeypatch.setattr(aiosmtplib, "send", send)
+    service = LoggingNotificationService()
+    await service.notify_task_assigned(
+        recipient_email="recipient@example.local",
+        task_title="Task",
+        project_name="Project",
+        assigner_name="Owner",
+    )
+    send.assert_not_awaited()
+
+
+async def test_notification_logging_sent_only_in_smtp_service(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    settings = Settings(
+        database_url="sqlite+aiosqlite://",
+        secret_key="test",
+        smtp_enabled=True,
+        smtp_host="127.0.0.1",
+        smtp_from_address="taskhub@example.local",
+    )
+    smtp_service = SmtpNotificationService(settings)
+    monkeypatch.setattr(aiosmtplib, "send", AsyncMock())
+
+    with caplog.at_level("INFO"):
+        await smtp_service.notify_task_assigned(
+            recipient_email="recipient@example.local",
+            task_title="Task",
+            project_name="Project",
+            assigner_name="Owner",
+        )
+    assert "Task assignment notification sent" in caplog.text
+
+    caplog.clear()
+    logging_service = LoggingNotificationService()
+    with caplog.at_level("INFO"):
+        await logging_service.notify_task_assigned(
+            recipient_email="recipient@example.local",
+            task_title="Task",
+            project_name="Project",
+            assigner_name="Owner",
+        )
+    assert "Task assignment notification sent" not in caplog.text
+    assert "Task assignment notification disabled" in caplog.text
+
+
+async def test_safe_wrapper_only_logs_on_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fake_ok = FakeNotificationService()
+    with caplog.at_level("INFO"):
+        await notify_task_assigned_safely(
+            fake_ok,
+            task_id=1,
+            recipient_email="recipient@example.local",
+            task_title="Task",
+            project_name="Project",
+            assigner_name="Owner",
+        )
+    assert "Task assignment notification sent" not in caplog.text
+
+    fake_fail = FakeNotificationService(fail=True)
+    with caplog.at_level("ERROR"):
+        await notify_task_assigned_safely(
+            fake_fail,
+            task_id=2,
+            recipient_email="recipient@example.local",
+            task_title="Task",
+            project_name="Project",
+            assigner_name="Owner",
+        )
+    assert "Task assignment notification failed: task_id=2" in caplog.text

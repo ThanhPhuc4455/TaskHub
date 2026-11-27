@@ -1,150 +1,250 @@
 # TaskHub API
 
-TaskHub is an async FastAPI task-management API using SQLAlchemy and PostgreSQL.
+TaskHub is an asynchronous FastAPI task-management API. It provides authentication,
+workspace RBAC, projects, tasks, labels, comments, Redis task-list caching, request
+IDs, structured errors, and background assignment notifications.
+
+## Stack
+
+- Python 3.12 and FastAPI
+- SQLAlchemy 2.x async + asyncpg
+- PostgreSQL 16
+- Redis 7
+- Alembic migrations
+- Pydantic v2 and pydantic-settings
+- Docker multi-stage build and Docker Compose
+
+## Repository layout
+
+```text
+app/
+  api/              FastAPI dependencies, routers, and endpoints
+  core/             settings, database, cache, logging, middleware, errors
+  models/           SQLAlchemy models and enums
+  repositories/     database access
+  schemas/          request and response schemas
+  services/         business rules and authorization
+alembic/            database migrations
+tests/              unit, API, PostgreSQL, and Redis integration tests
+Dockerfile          multi-stage production image
+docker-compose.yml  app + PostgreSQL + Redis stack
+```
+
+## Environment variables
+
+Copy `.env.example` to `.env` (local host execution uses `127.0.0.1`). Secrets are examples only;
+replace them locally and never commit `.env`.
+
+| Name | Required | Default | Example |
+|---|---:|---|---|
+| `APP_ENV` | no | `development` (Compose: `production`) | `development` |
+| `TASKHUB_DEBUG` | no | `false` | `true` |
+| `LOG_LEVEL` | no | `INFO` | `INFO` |
+| `DATABASE_URL` | Local only | — | `postgresql+asyncpg://taskhub:password@127.0.0.1:5432/taskhub` |
+| `SECRET_KEY` | yes | — | `a-long-local-secret-32-chars-long` |
+| `DB_ECHO` | no | `false` | `false` |
+| `REDIS_URL` | no | `redis://127.0.0.1:6379/0` | `redis://127.0.0.1:6379/0` |
+| `CACHE_TTL_SECONDS` | no | `120` | `120` |
+| `REDIS_SOCKET_CONNECT_TIMEOUT` | no | `1.0` | `1.0` |
+| `REDIS_SOCKET_TIMEOUT` | no | `1.0` | `1.0` |
+| `SMTP_ENABLED` | no | `false` | `false` |
+| `SMTP_HOST` | if SMTP enabled | — (Compose: `mailpit`) | `127.0.0.1` |
+| `SMTP_PORT` | no | `1025` | `1025` |
+| `SMTP_USERNAME` | no | — | `smtp-user` |
+| `SMTP_PASSWORD` | no | — | `smtp-password` |
+| `SMTP_USE_TLS` | no | `false` | `false` |
+| `SMTP_START_TLS` | no | `false` | `false` |
+| `SMTP_TIMEOUT_SECONDS` | no | `10` | `10` |
+| `SMTP_FROM_ADDRESS` | if SMTP enabled | — (Compose: `taskhub@example.local`) | `taskhub@example.local` |
+| `MAILPIT_WEB_PORT` | Compose only | `8025` | `8025` |
+| `APP_PORT` | Compose only | `8001` | `8001` |
+| `POSTGRES_DB` | Compose only | — | `taskhub` |
+| `POSTGRES_USER` | Compose only | — | `taskhub` |
+| `POSTGRES_PASSWORD` | Compose only | — | local password |
+
+`APP_ENV` accepts `development`, `test`, or `production`. In `.env.example`, `APP_ENV` is commented out by default (`# APP_ENV=development`). In Docker Compose, `APP_ENV` defaults to `production`. Production strictly requires a non-default `SECRET_KEY` of at least 32 characters. `LOG_LEVEL` accepts `DEBUG`, `INFO`, `WARNING`, or `ERROR`; production defaults to `INFO`. `TASKHUB_DEBUG` enables debug mode explicitly (`False` by default).
 
 ## Run locally
+
+With `.env` pointing at a reachable PostgreSQL and Redis instance:
 
 ```powershell
 uv sync
 uv run alembic upgrade head
-uv run fastapi dev app/main.py
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Run the checks with:
+The lightweight health endpoint is available at `GET http://127.0.0.1:8000/health` (returns `{"status":"ok"}` without querying the database). The interactive API documentation is available at `http://127.0.0.1:8000/docs` and ReDoc at `http://127.0.0.1:8000/redoc`.
+
+## Run with Docker Compose
+
+After setting the variables from `.env.example`:
+
+> [!IMPORTANT]
+> Because Docker Compose defaults to `APP_ENV=production`, setting a strong `SECRET_KEY` (at least 32 characters, not matching default sample keys) in `.env` is required. The application container will fail startup validation if `SECRET_KEY` is weak or missing.
+
+Start the application stack:
 
 ```powershell
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy .
-uv run pytest -q
+docker compose -p taskhub_day7 up -d --build
+Start-Sleep -Seconds 10
+docker compose -p taskhub_day7 ps
+docker compose -p taskhub_day7 logs app
 ```
 
-## Day 4 authorization
+The Compose app runs by default with `APP_ENV=production` (requiring a non-default `SECRET_KEY` of at least 32 characters). To run Compose in development mode, uncomment `APP_ENV=development` in `.env` or override `APP_ENV` in your environment (for example, `$env:APP_ENV = "development"`).
 
-Workspace roles are ordered as `VIEWER < EDITOR < OWNER`. `ADMIN` is a system-wide
-role and bypasses workspace membership checks.
+To run development services (such as Mailpit for local email inspection), include `--profile dev`:
 
-| Action | VIEWER | EDITOR | OWNER | ADMIN |
-|---|---:|---:|---:|---:|
-| View workspace/project | yes | yes | yes | yes |
-| Create/update project | no | yes | yes | yes |
-| Archive/delete project | no | no | yes | yes |
-| Invite/remove/change member role | no | no | yes | yes |
-| Delete workspace | no | no | yes | yes |
+```powershell
+docker compose -p taskhub_day7 --profile dev up -d --build
+```
 
-Users outside a workspace receive `404` so resource existence is not disclosed.
-Authenticated users without enough permission receive `403`; missing or invalid
-credentials receive `401`; duplicate resources return `409`.
+Compose automatically constructs `DATABASE_URL` from `POSTGRES_USER`,
+`POSTGRES_PASSWORD`, and `POSTGRES_DB`, and sets `REDIS_URL` to internal service `redis://redis:6379/0`.
+The Compose app waits for healthy PostgreSQL and Redis, runs `alembic upgrade head`,
+then starts Uvicorn. Only the application port (`8001`) is published to the host by default;
+when `--profile dev` is enabled, Mailpit web interface (`8025`) is also published at `http://127.0.0.1:8025`.
+PostgreSQL and Redis communicate internally over the compose network without exposing host ports.
 
-Workspace deletion cascades members and projects at both the ORM relationship and
-database foreign-key level. Project deletion consequently cascades its tasks and
-labels, and task deletion cascades comments and task-label links.
+When running via Compose, the healthcheck endpoint is available at `GET http://127.0.0.1:8001/health` and docs at `http://127.0.0.1:8001/docs`.
+
+### Stop and clean up Compose
+
+To stop running containers:
+
+```powershell
+docker compose -p taskhub_day7 down
+```
+
+To stop containers and remove persistent volumes (warning: deletes all database data):
+
+```powershell
+docker compose -p taskhub_day7 down -v
+```
 
 ## Create an ADMIN user
 
-ADMIN creation is intentionally not exposed through public registration. After the
-database is migrated, run the seed script from PowerShell:
+ADMIN creation is intentionally not exposed through public registration.
+In a running Docker Compose environment, create an ADMIN user with:
+
+```powershell
+docker compose -p taskhub_day7 exec app python scripts/create_admin.py `
+  --email admin@example.com `
+  --full-name "TaskHub Admin" `
+  --password "change-this-password-32-chars-ok"
+```
+
+Or when running locally:
 
 ```powershell
 uv run python scripts/create_admin.py `
   --email admin@example.com `
   --full-name "TaskHub Admin" `
-  --password "change-this-password"
+  --password "change-this-password-32-chars-ok"
 ```
 
-An ADMIN can verify access through `GET /api/v1/admin/workspaces`.
+## Tests and quality checks
 
-## API groups
+Use a disposable review database for PostgreSQL integration tests. Replace `password` with your local PostgreSQL password, and adjust the port (such as `5434` or `5432`) to match your PostgreSQL server instance:
 
-- Workspace: `/api/v1/workspaces`
-- Members: `/api/v1/workspaces/{workspace_id}/members`
-- Projects: `/api/v1/workspaces/{workspace_id}/projects` and `/api/v1/projects/{project_id}`
-- ADMIN: `/api/v1/admin/workspaces`
-- Tasks: `/api/v1/projects/{project_id}/tasks` and `/api/v1/tasks/{task_id}`
-- Labels: `/api/v1/projects/{project_id}/labels` and `/api/v1/labels/{label_id}`
-- Comments: `/api/v1/tasks/{task_id}/comments`
+```powershell
+$reviewDb = "postgresql+asyncpg://taskhub:password@127.0.0.1:5434/taskhub_review"
+$env:DATABASE_URL = $reviewDb
+$env:REVIEW8_DATABASE_URL = $reviewDb
+$env:REVIEW9_DATABASE_URL = $reviewDb
+$env:REVIEW9_MIGRATION_DATABASE_URL = $reviewDb
+$env:REVIEW10_DATABASE_URL = $reviewDb
+$env:REVIEW11_DATABASE_URL = $reviewDb
+$env:REVIEW12_DATABASE_URL = $reviewDb
+uv run pytest -rs
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy .
+uv run alembic upgrade head
+uv run alembic check
+```
 
-## Day 5 task management
+## API example
 
-Tasks, labels, and comments resolve their owning project and workspace before
-authorization. VIEWER can read; EDITOR can create/update/delete tasks and labels
-and add comments; comment deletion is limited to the author, workspace OWNER, or
-ADMIN. Archived projects are read-only. A task assignee must already be a member
-of the workspace, labels cannot cross projects, and duplicate task-label links
-return `409`.
+Run the local server first, then execute this PowerShell example:
 
-Task listing supports `status`, `priority`, `assignee_id`, `page`, and `limit`.
-It returns `items`, `total`, `page`, and `limit`, ordered by `created_at DESC,
-id DESC`. Invalid input returns `422`; missing resources are `404` and
-insufficient role is `403`.
+```powershell
+$base = "http://127.0.0.1:8000"
+$email = "demo-$([Guid]::NewGuid().ToString('N'))@example.com"
+$password = "password123"
+$user = Invoke-RestMethod -Method Post "$base/api/v1/auth/register" `
+  -ContentType "application/json" `
+  -Body (@{email=$email; full_name="Demo User"; password=$password} | ConvertTo-Json)
+$token = Invoke-RestMethod -Method Post "$base/api/v1/auth/login" `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body @{username=$email; password=$password}
+$headers = @{Authorization="Bearer $($token.access_token)"}
+$workspace = Invoke-RestMethod -Method Post "$base/api/v1/workspaces" `
+  -Headers $headers -ContentType "application/json" `
+  -Body (@{name="Demo workspace"} | ConvertTo-Json)
+$project = Invoke-RestMethod -Method Post "$base/api/v1/workspaces/$($workspace.id)/projects" `
+  -Headers $headers -ContentType "application/json" `
+  -Body (@{name="Demo project"} | ConvertTo-Json)
+$task = Invoke-RestMethod -Method Post "$base/api/v1/projects/$($project.id)/tasks" `
+  -Headers $headers -ContentType "application/json" `
+  -Body (@{title="First task"} | ConvertTo-Json)
+$task
+```
 
-List endpoints accept `page` and `limit` query parameters. `page` starts at 1;
-the default `limit` is 20 and the allowed range is 1–100. List responses use the
-same envelope:
+## Authorization and errors
+
+Workspace roles are ordered `VIEWER < EDITOR < OWNER`. `ADMIN` is system-wide and
+bypasses workspace membership checks. Users outside a workspace receive `404` so
+resource existence is not disclosed; authenticated users without enough permission
+receive `403`.
+
+Every error response uses the envelope below. Validation errors use a list in
+`detail`; domain and HTTP errors use a string:
 
 ```json
 {
-  "items": [],
-  "total": 0,
-  "page": 1,
-  "limit": 20
+  "detail": "Project 42 not found",
+  "code": "not_found",
+  "request_id": "trace-123"
 }
 ```
 
+Every response has an `X-Request-ID` header. Application and server logs (including
+Uvicorn) include `request_id` in their log output, and redact sensitive fields
+(Authorization tokens, passwords, access tokens, and refresh tokens).
+
+## Task-list cache
+
+`GET /api/v1/projects/{project_id}/tasks` uses Redis cache-aside after authentication
+and RBAC. The version key is `project:{project_id}:tasks:ver`; invalidation increments
+that key with `INCR`. Data keys include the project, cache version, normalized filters,
+assignee, page, and limit. Cached values are JSON responses with `items`, `total`,
+`page`, and `limit`, and expire after `CACHE_TTL_SECONDS`.
+
+Redis read/write failures are logged and fall back to PostgreSQL. Invalidation runs
+after successful database commits. If invalidation fails after a commit, an older
+cache entry can remain for at most `CACHE_TTL_SECONDS`.
+
+## Notifications
+
+Assignment notifications use FastAPI `BackgroundTasks`. SMTP is disabled by default;
+when enabled, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
+`SMTP_USE_TLS`, `SMTP_START_TLS`, `SMTP_TIMEOUT_SECONDS`, and `SMTP_FROM_ADDRESS`.
+Notifications are queued only when a task is assigned to another user or changed to a new assignee.
+
+For local testing, start the Mailpit service with `docker compose -p taskhub_day7 --profile dev up -d`.
+Mailpit accepts SMTP on the internal `mailpit:1025` address and its web UI is available at
+`http://127.0.0.1:8025`. Set `SMTP_ENABLED=true`, `SMTP_HOST=mailpit`, `SMTP_PORT=1025`,
+`SMTP_USE_TLS=false`, and `SMTP_START_TLS=false` in the compose environment.
+Notification send failures are logged without the recipient address and do not fail the API request.
+
 ## Migrations
 
-Always run `uv run alembic upgrade head` before starting the application. The
-application does not create tables automatically.
-
-## Day 6 runtime features
-
-### Task-list caching
-
-`GET /api/v1/projects/{project_id}/tasks` uses cache-aside Redis caching after
-authentication and workspace RBAC have completed. The version key is
-`project:{project_id}:tasks:ver`; data keys use the current version and a SHA-256
-hash of normalized status, priority, assignee, page, and limit filters. Cached
-responses are JSON and expire after `CACHE_TTL_SECONDS` (120 seconds by default).
-
-Redis failures are logged and transparently fall back to the database. Cache
-versions are incremented after successful commits for task create/update/delete,
-label create/update/delete and attach/detach, project archive/unarchive/delete,
-workspace cascade deletion, and profile changes for users who are task assignees.
-If Redis invalidation fails after the database commit succeeds, an older cache
-entry may remain visible for at most `CACHE_TTL_SECONDS` (120 seconds by
-default), after which it expires naturally.
-Member removal does not invalidate task lists because it does not change the
-assignee summary stored in a task response. No cache key contains caller data:
-the response is not user-specific after RBAC authorization.
-
-### Assignment notifications
-
-Task assignment notifications use FastAPI `BackgroundTasks` and an injectable
-`NotificationService`. The default implementation logs a safe mail-like event;
-it does not log passwords, tokens, or other sensitive data. A notification is
-queued after a successful task commit when a task is created with another user
-as assignee or when an existing task changes to a new assignee. It is not queued
-for unchanged assignments, unassignment, self-assignment, invalid assignees, or
-failed writes. Notification failures are caught and logged without changing the
-successful API response.
-
-### Request IDs and errors
-
-Every HTTP response includes `X-Request-ID`. A valid client-supplied ID is
-preserved; invalid or oversized IDs are replaced with a UUID4. Request logs
-contain method, path, status, duration, and request ID, but never authorization
-headers or request bodies. Domain, HTTP, validation, and unexpected errors keep
-the existing `detail` field and add `code` and `request_id`. Unexpected errors
-return a generic 500 message while the full traceback remains server-side.
-
-The test suite uses an injectable fake cache and notification service. A real
-Redis integration test can be added separately when Redis is available; the
-normal suite does not require a running Redis instance. Run the real Redis
-integration tests with:
+Run migrations before starting the application:
 
 ```powershell
-uv run pytest -q -m redis_integration
+uv run alembic upgrade head
 ```
 
-These tests use Redis database 1, skip only when Redis is unavailable, and clean
-only their own `project:integration:*` keys with SCAN/DEL.
+The application does not create PostgreSQL tables automatically.
