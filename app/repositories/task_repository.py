@@ -5,7 +5,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import lazyload, selectinload
+from sqlalchemy.orm import raiseload, selectinload
 
 from app.core.pagination import PageResult, Pagination
 from app.models.label import task_labels
@@ -38,7 +38,7 @@ class TaskRepository(BaseRepository[Task]):
         return await self.session.scalar(
             select(Task)
             .where(Task.id == task_id)
-            .options(lazyload(Task.labels), lazyload(Task.assignee), lazyload(Task.creator))
+            .options(raiseload(Task.labels), raiseload(Task.assignee), raiseload(Task.creator))
         )
 
     async def get_with_details(self, task_id: int) -> Task | None:

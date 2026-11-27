@@ -1,6 +1,9 @@
+import pytest
 from httpx import AsyncClient
+from sqlalchemy.exc import InvalidRequestError
 
 from app.main import app as fastapi_app
+from app.repositories.task_repository import TaskRepository
 from tests.helpers import capture_queries, create_workspace_and_project, login_as
 
 
@@ -89,3 +92,27 @@ async def test_list_comments_query_count(client: AsyncClient) -> None:
     assert response.status_code == 200
     assert response.json()["total"] == 1
     assert len(statements) == 7
+
+
+async def test_get_summary_raises_on_unloaded_relationships(client: AsyncClient) -> None:
+    owner = await login_as(client, "summary-raiseload-owner@example.com")
+    _, project_id = await create_workspace_and_project(
+        client, owner, workspace_name="Summary raiseload workspace"
+    )
+    created_task = await client.post(
+        f"/api/v1/projects/{project_id}/tasks",
+        json={"title": "Summary raiseload task"},
+        headers=owner,
+    )
+    assert created_task.status_code == 201
+    task_id = created_task.json()["id"]
+
+    async with fastapi_app.state.test_sessionmaker() as session:
+        task = await TaskRepository(session).get_summary(task_id)
+        assert task is not None
+        with pytest.raises(InvalidRequestError):
+            _ = task.labels
+        with pytest.raises(InvalidRequestError):
+            _ = task.assignee
+        with pytest.raises(InvalidRequestError):
+            _ = task.creator
